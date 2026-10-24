@@ -1,4 +1,4 @@
-# Speech Mirror
+# Speechly
 
 ### Being understood changes what someone can do next.
 
