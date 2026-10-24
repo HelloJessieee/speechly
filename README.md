@@ -1,11 +1,34 @@
-# MouthCoach
+# Speech Mirror
 
-Practice American English pronunciation with visual guidance.
+### Being understood changes what someone can do next.
 
-MouthCoach is a frontend prototype of a pronunciation practice tool for language learners and anyone who wants extra speech
-practice. It is a training aid. It does not diagnose, treat or assess any condition.
+Imagine rehearsing a sentence before speaking in class, asking for help, or joining a conversation. You say it aloud, and a speech recognizer returns different words. The speaker knows what they meant; the model only has a guess. For people with speech disabilities, being misunderstood can make ordinary moments harder to enter. A practice tool should not turn that uncertainty into a verdict about the person.
 
-## Setup and run
+Speech Mirror gives that choice back to the speaker. They record a sentence, review what the model heard, and confirm their own words. A word-by-word mouth guide can be viewed alongside their lip movement. Voice measurements and a locally generated Gemma suggestion then turn the attempt into one concrete action to try next.
+
+We are building for English learners and people with speech differences, including people with speech disabilities who may benefit from visual cues and a private place to rehearse. The social goal is simple: give more people tools to participate in everyday communication on their own terms. Speech Mirror supports practice; it does not replace a speech-language professional or claim a clinical benefit that has not been demonstrated.
+
+**Speak → See → Improve.** Record and confirm your words; follow a visual guide; review the evidence, practice one action, and try again.
+
+The current published prototype includes a native iPhone app, a browser-based lesson experience, and a Mac companion for local Whisper recognition, speech measurements, experimental phoneme comparison, and Gemma 4 E2B coaching through LiteRT-LM. The visual guide and model outputs are practice aids. Speech Mirror does not diagnose, treat, or score a medical condition, and the prototype has not established clinical or pronunciation outcomes.
+
+<img src="docs/assets/team.jpg" alt="The Speech Mirror team together outdoors" width="720">
+
+*The team behind Speech Mirror.*
+
+<img src="articulation-studio/dist/assets/reference.png" alt="Character concept sheet with head angles and illustrative mouth shapes" width="720">
+
+*Our visual exploration for the interactive articulation guide; these mouth shapes are illustrative.*
+
+## The complete practice loop
+
+1. **Speak and confirm.** Speak freely or choose a target word, then record or import audio. The web analysis prototype shows live microphone level and can optionally track visible lip movement with the camera. Whisper proposes a transcript; the speaker edits it to match what they intended to say. The model's guess never becomes the speaker's intention by default.
+2. **See the movement.** The confirmed sentence becomes a looping word-by-word mouth guide. A yellow outline shows the illustrative reference while a blue outline traces measured lip movement when the camera is on. The guide can be replayed slowly, viewed step by step, or used with preset word lessons.
+3. **Understand and retry.** The result separates model guesses from measured evidence: recording quality, duration, volume, pitch, and optional tentative phoneme comparison for single words. Gemma 4 E2B reads the confirmed words and structured measurements to suggest one practical next step. The speaker can replay, focus on a word, and record again.
+
+In the current iPhone prototype, recording and live visual guidance run on the phone while a trusted-network Mac companion runs Whisper, the experimental phoneme model, and Gemma through LiteRT-LM. The separate browser lesson app also offers guided examples and demo feedback. Neither model output nor visual animation is a pronunciation score or diagnosis.
+
+## Browser lesson app: setup and run
 
 Requires Node.js 20 or newer.
 
@@ -18,7 +41,7 @@ npm test           # Playwright browser tests (starts the dev server automatical
 npm run lint
 ```
 
-No API keys, backend or network services are needed. Fonts and icons are bundled locally. Camera and microphone access require
+This browser lesson app needs no API keys, backend or network services. Fonts and icons are bundled locally. Camera and microphone access require
 `localhost` or HTTPS.
 
 ## What works
