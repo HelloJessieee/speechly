@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.js';
 import { OrbitControls } from './vendor/OrbitControls.js';
-import { createCharacter } from './rig.js?rev=teeth-2';
+import { createCharacter } from './rig.js?rev=tongue-hair-3';
 import { createController, parameterSchema, presets, sampleSequences } from './controller.js';
 
 const $ = (s) => document.querySelector(s);

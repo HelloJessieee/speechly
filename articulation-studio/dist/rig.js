@@ -223,44 +223,117 @@ export function createCharacter() {
   }
 
   // An irregular scalp cap and overlapping tapered locks make a sculpted hairstyle.
+  // The cap follows the head ellipsoid and its lower rim turns into the head.
+  // Locks are seated against that same surface instead of independent air paths.
   const hairSegments = 100, hairRows = 32;
-  const scalpGeometry = makeGrid(hairRows, hairSegments, true);
+  function hairlineEnd(phi) {
+    const forward = (Math.sin(phi) + 1) / 2;
+    return mix(1.92, 1.12, smooth(forward))
+      + 0.018 * Math.sin(phi * 6) + 0.01 * Math.sin(phi * 10);
+  }
+  function scalpSample(theta, phi, depthOverride) {
+    const sinTheta = Math.sin(theta), cosTheta = Math.cos(theta);
+    const normal = new THREE.Vector3(
+      sinTheta * Math.cos(phi) / rx,
+      cosTheta / ry,
+      sinTheta * Math.sin(phi) / rz,
+    ).normalize();
+    const depth = depthOverride ?? (0.06 + sinTheta ** 2
+      * (0.016 + 0.008 * Math.sin(phi * 7 + theta * 1.8)));
+    const point = new THREE.Vector3(
+      rx * sinTheta * Math.cos(phi),
+      ry * cosTheta,
+      rz * sinTheta * Math.sin(phi),
+    ).addScaledVector(normal, depth);
+    return { point, normal, depth };
+  }
+  function finishHairGeometry(geometry, rows, columns) {
+    geometry.computeVertexNormals();
+    const normals = geometry.attributes.normal;
+    const a = new THREE.Vector3(), b = new THREE.Vector3();
+    // The grid duplicates its seam. Share its normals so a dark seam cannot
+    // look like a split between the cap and a lock.
+    for (let row = 0; row <= rows; row++) {
+      const first = row * (columns + 1), last = first + columns;
+      a.fromBufferAttribute(normals, first);
+      b.fromBufferAttribute(normals, last);
+      a.add(b);
+      if (a.lengthSq() < 1e-12) a.set(0, 1, 0);
+      a.normalize();
+      normals.setXYZ(first, a.x, a.y, a.z);
+      normals.setXYZ(last, a.x, a.y, a.z);
+    }
+    normals.needsUpdate = true;
+    geometry.computeBoundingSphere();
+  }
+  const scalpGeometry = makeGrid(hairRows + 1, hairSegments, true);
   const scalpPositions = scalpGeometry.attributes.position.array;
   let scalpIndex = 0;
-  for (let row = 0; row <= hairRows; row++) {
+  for (let row = 0; row <= hairRows + 1; row++) {
     for (let c = 0; c <= hairSegments; c++) {
       const phi = c / hairSegments * Math.PI * 2;
-      const forward = (Math.sin(phi) + 1) / 2;
-      const end = mix(1.98, 1.22, smooth(forward));
-      const theta = row / hairRows * (end + 0.025 * Math.sin(phi * 7));
-      const ripple = 1 + 0.014 * Math.sin(phi * 9 + theta * 2);
-      scalpPositions[scalpIndex++] = 1.29 * Math.sin(theta) * Math.cos(phi) * ripple;
-      scalpPositions[scalpIndex++] = 0.16 + 1.49 * Math.cos(theta);
-      scalpPositions[scalpIndex++] = 1.11 * Math.sin(theta) * Math.sin(phi) * ripple - 0.045;
+      const theta = Math.min(row, hairRows) / hairRows * hairlineEnd(phi);
+      // This short final ring closes the visible edge into the skin.
+      const sample = scalpSample(theta, phi, row === hairRows + 1 ? -0.012 : undefined);
+      scalpPositions[scalpIndex++] = sample.point.x;
+      scalpPositions[scalpIndex++] = sample.point.y;
+      scalpPositions[scalpIndex++] = sample.point.z;
     }
   }
-  scalpGeometry.computeVertexNormals();
+  finishHairGeometry(scalpGeometry, hairRows + 1, hairSegments);
+  for (let c = 0; c <= hairSegments; c++) scalpGeometry.attributes.normal.setXYZ(c, 0, 1, 0);
   mesh(scalpGeometry, hairDark, 'HairScalp');
 
   function hairLock(name, points, width, mat = hair) {
     const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
-    const frames = curve.computeFrenetFrames(30, false);
-    const geometry = makeGrid(30, 12, true);
+    const rows = 30, columns = 12;
+    const geometry = makeGrid(rows, columns, true);
     const array = geometry.attributes.position.array;
-    const vector = new THREE.Vector3();
-    let i = 0;
-    for (let row = 0; row <= 30; row++) {
-      const t = row / 30;
-      const center = curve.getPointAt(t);
-      const radius = width * (0.56 + 0.46 * Math.sin(t * Math.PI)) * Math.max(0.012, (1 - t) ** 0.43);
-      for (let c = 0; c <= 12; c++) {
-        const a = c / 12 * Math.PI * 2;
-        vector.copy(center).addScaledVector(frames.normals[row], Math.cos(a) * radius)
-          .addScaledVector(frames.binormals[row], Math.sin(a) * radius * 0.57);
-        array[i++] = vector.x; array[i++] = vector.y; array[i++] = vector.z;
+    const centers = [], surfaceNormals = [], widths = [], depths = [];
+    for (let row = 0; row <= rows; row++) {
+      const t = row / rows;
+      const direction = curve.getPointAt(t).divide(new THREE.Vector3(rx, ry, rz)).normalize();
+      const theta = Math.acos(clamp(direction.y, -1, 1));
+      const phi = Math.atan2(direction.z, direction.x);
+      const sample = scalpSample(theta, phi);
+      const boundary = hairlineEnd(phi);
+      let coverage = 1 - smooth((theta - boundary) / 0.1);
+      const radius = width * (0.68 + 0.32 * Math.sin(t * Math.PI)) * Math.sqrt(1 - t);
+      const depth = radius * 0.64;
+      // Beyond the cap boundary, keep the underside inside the actual skin;
+      // a thin tail must not inherit an unsupported offset from the cap.
+      if (theta > boundary) coverage = Math.min(coverage, depth * 0.65 / sample.depth);
+      const seating = mix(-0.62, 0.1, smooth(t / 0.25));
+      const tipSink = sample.depth * coverage * smooth((t - 0.72) / 0.28);
+      // Every section cuts into the continuous cap or skin. Tips finish in
+      // that surface too, including the fringe below the cap's hairline.
+      sample.point.addScaledVector(sample.normal,
+        -sample.depth * (1 - coverage) + depth * seating - tipSink);
+      centers.push(sample.point); surfaceNormals.push(sample.normal);
+      widths.push(radius); depths.push(depth);
+    }
+    const tangent = new THREE.Vector3(), lateral = new THREE.Vector3();
+    const normal = new THREE.Vector3(), vertex = new THREE.Vector3();
+    let index = 0;
+    for (let row = 0; row <= rows; row++) {
+      const center = centers[row], outward = surfaceNormals[row];
+      tangent.subVectors(centers[Math.min(rows, row + 1)], centers[Math.max(0, row - 1)]);
+      tangent.addScaledVector(outward, -tangent.dot(outward));
+      if (tangent.lengthSq() < 1e-10) {
+        tangent.crossVectors(outward, Math.abs(outward.y) > 0.9
+          ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0));
+      }
+      tangent.normalize();
+      lateral.crossVectors(outward, tangent).normalize();
+      normal.crossVectors(tangent, lateral).normalize();
+      for (let c = 0; c <= columns; c++) {
+        const angle = c / columns * Math.PI * 2;
+        vertex.copy(center).addScaledVector(lateral, Math.cos(angle) * widths[row])
+          .addScaledVector(normal, Math.sin(angle) * depths[row]);
+        array[index++] = vertex.x; array[index++] = vertex.y; array[index++] = vertex.z;
       }
     }
-    geometry.computeVertexNormals();
+    finishHairGeometry(geometry, rows, columns);
     return mesh(geometry, mat, name);
   }
   const locks = [
@@ -465,6 +538,167 @@ export function createCharacter() {
     return { width: (0.235 - state.tongueUp * 0.04) * cap, height: (0.072 + state.tongueUp * 0.012) * cap };
   }
 
+  function lipThickness(upper) {
+    const openness = smooth(mouthHeight / 0.15);
+    return (upper ? mix(0.024, 0.039, openness) : mix(0.03, 0.051, openness)) * (1 + state.lipRound * 0.36);
+  }
+
+  function innerLipBounds(x) {
+    const upperThickness = lipThickness(true), lowerThickness = lipThickness(false);
+    const upperWidth = Math.max(0.001, mouthWidth - upperThickness);
+    const lowerWidth = Math.max(0.001, mouthWidth - lowerThickness);
+    const upperAngle = Math.acos(clamp(x / upperWidth, -1, 1));
+    const lowerAngle = Math.PI * 2 - Math.acos(clamp(x / lowerWidth, -1, 1));
+    return {
+      upper: mouthPoint(upperAngle).y - Math.sin(upperAngle) * upperThickness,
+      lower: mouthPoint(lowerAngle).y - Math.sin(lowerAngle) * lowerThickness,
+    };
+  }
+
+  // Lift remains independent inside the oral cavity. As the tongue approaches
+  // the lips, fit its whole oval cross-section through their actual inner edge.
+  // This bends a raised tongue through the opening instead of toward the nose.
+  function fittedTongueRing(t) {
+    const center = tongueCenter(t), radius = tongueRadius(t);
+    const approachDepth = surfaceZ(0, mouthCenter) + 0.044;
+    const fit = smooth((center.z - (approachDepth - 0.25)) / 0.14);
+    if (fit === 0) return { center, radius };
+    const halfWidth = Math.max(0.002, mouthWidth - Math.max(lipThickness(true), lipThickness(false)) - 0.018);
+    const fitX = clamp(center.x, -halfWidth * 0.7, halfWidth * 0.7);
+    const fitWidth = Math.min(radius.width, Math.max(0.001, halfWidth - Math.abs(fitX)) * 0.84);
+    let lower = -Infinity, upper = Infinity;
+    for (let sample = 0; sample <= 12; sample++) {
+      const x = mix(fitX - fitWidth, fitX + fitWidth, sample / 12);
+      const bounds = innerLipBounds(x);
+      lower = Math.max(lower, bounds.lower + 0.016);
+      upper = Math.min(upper, bounds.upper - 0.016);
+    }
+    const gap = upper - lower;
+    const fitHeight = Math.min(radius.height, Math.max(0.001, gap * 0.48));
+    const fitY = gap >= fitHeight * 2 ? clamp(center.y, lower + fitHeight, upper - fitHeight) : (lower + upper) / 2;
+    center.x = mix(center.x, fitX, fit);
+    center.y = mix(center.y, fitY, fit);
+    radius.width = mix(radius.width, fitWidth, fit);
+    radius.height = mix(radius.height, fitHeight, fit);
+    return { center, radius };
+  }
+
+  // Independent collision index: its domain follows the complete tongue,
+  // including lateral and lifted positions, rather than the dental bounds.
+  const tongueGridSize = 26;
+  const tongueBuckets = Array.from({ length: tongueGridSize ** 2 }, () => []);
+  const tongueCollisionTriangles = new Float64Array((frontGeometry.index.count + lipGeometry.index.count) / 3 * 11);
+  const tongueDomain = { minX: 0, minY: 0, scaleX: 1, scaleY: 1 };
+  const tongueCorrections = new Float64Array(tongueRows + 1);
+  const tongueMargin = 0.014;
+  const tongueSampleList = [];
+  const tongueEdges = new Set();
+  for (let i = 0; i < tongueGeometry.attributes.position.count; i++) tongueSampleList.push([i, i, i, 1, 0, 0]);
+  const tongueIndices = tongueGeometry.index.array;
+  for (let i = 0; i < tongueIndices.length; i += 3) {
+    const ids = [tongueIndices[i], tongueIndices[i + 1], tongueIndices[i + 2]];
+    for (let edge = 0; edge < 3; edge++) {
+      const a = Math.min(ids[edge], ids[(edge + 1) % 3]), b = Math.max(ids[edge], ids[(edge + 1) % 3]);
+      const key = `${a},${b}`;
+      if (!tongueEdges.has(key)) { tongueEdges.add(key); tongueSampleList.push([a, b, b, 0.5, 0.5, 0]); }
+    }
+    tongueSampleList.push([...ids, 1 / 3, 1 / 3, 1 / 3]);
+  }
+
+  function indexTongueSurfaces() {
+    for (const bucket of tongueBuckets) bucket.length = 0;
+    tongueGeometry.computeBoundingBox();
+    const box = tongueGeometry.boundingBox;
+    const minX = box.min.x - 0.004, minY = box.min.y - 0.004;
+    const maxX = box.max.x + 0.004, maxY = box.max.y + 0.004;
+    const scaleX = tongueGridSize / Math.max(0.008, maxX - minX);
+    const scaleY = tongueGridSize / Math.max(0.008, maxY - minY);
+    Object.assign(tongueDomain, { minX, minY, scaleX, scaleY });
+    let triangle = 0;
+    for (const [geometry, role] of [[frontGeometry, 0], [lipGeometry, 1]]) {
+      const p = geometry.attributes.position.array, indices = geometry.index.array;
+      for (let i = 0; i < indices.length; i += 3) {
+        const a = indices[i] * 3, b = indices[i + 1] * 3, c = indices[i + 2] * 3;
+        const x0 = p[a], y0 = p[a + 1], z0 = p[a + 2];
+        const x1 = p[b], y1 = p[b + 1], z1 = p[b + 2];
+        const x2 = p[c], y2 = p[c + 1], z2 = p[c + 2];
+        const loX = Math.min(x0, x1, x2), hiX = Math.max(x0, x1, x2);
+        const loY = Math.min(y0, y1, y2), hiY = Math.max(y0, y1, y2);
+        if (loX > maxX || hiX < minX || loY > maxY || hiY < minY) continue;
+        const dx1 = x1 - x0, dy1 = y1 - y0, dx2 = x2 - x0, dy2 = y2 - y0;
+        const determinant = dx1 * dy2 - dy1 * dx2;
+        if (Math.abs(determinant) < 1e-12) continue;
+        const offset = triangle++ * 11;
+        tongueCollisionTriangles.set([x0, y0, z0, dx1, dy1, z1 - z0, dx2, dy2, z2 - z0, 1 / determinant, role], offset);
+        const colLo = clamp(Math.floor((loX - minX) * scaleX), 0, tongueGridSize - 1);
+        const colHi = clamp(Math.floor((hiX - minX) * scaleX), 0, tongueGridSize - 1);
+        const rowLo = clamp(Math.floor((loY - minY) * scaleY), 0, tongueGridSize - 1);
+        const rowHi = clamp(Math.floor((hiY - minY) * scaleY), 0, tongueGridSize - 1);
+        for (let row = rowLo; row <= rowHi; row++) for (let col = colLo; col <= colHi; col++) {
+          tongueBuckets[row * tongueGridSize + col].push(offset);
+        }
+      }
+    }
+  }
+
+  function tongueSurfaceLimit(x, y) {
+    const col = Math.floor((x - tongueDomain.minX) * tongueDomain.scaleX);
+    const row = Math.floor((y - tongueDomain.minY) * tongueDomain.scaleY);
+    if (col < 0 || col >= tongueGridSize || row < 0 || row >= tongueGridSize) return Infinity;
+    let skinZ = -Infinity, lipBackZ = Infinity;
+    for (const i of tongueBuckets[row * tongueGridSize + col]) {
+      const dx = x - tongueCollisionTriangles[i], dy = y - tongueCollisionTriangles[i + 1];
+      const u = (dx * tongueCollisionTriangles[i + 7] - dy * tongueCollisionTriangles[i + 6]) * tongueCollisionTriangles[i + 9];
+      const v = (dy * tongueCollisionTriangles[i + 3] - dx * tongueCollisionTriangles[i + 4]) * tongueCollisionTriangles[i + 9];
+      if (u < -1e-7 || v < -1e-7 || u + v > 1.0000001) continue;
+      const z = tongueCollisionTriangles[i + 2] + u * tongueCollisionTriangles[i + 5] + v * tongueCollisionTriangles[i + 8];
+      if (tongueCollisionTriangles[i + 10] === 0) skinZ = Math.max(skinZ, z);
+      else lipBackZ = Math.min(lipBackZ, z);
+    }
+    return Math.min(skinZ === -Infinity ? Infinity : skinZ, lipBackZ) - tongueMargin;
+  }
+
+  function containTongue() {
+    indexTongueSurfaces();
+    tongueCorrections.fill(0);
+    const p = tongueGeometry.attributes.position.array;
+    for (const [ia, ib, ic, wa, wb, wc] of tongueSampleList) {
+      const a = ia * 3, b = ib * 3, c = ic * 3;
+      const x = p[a] * wa + p[b] * wb + p[c] * wc;
+      const y = p[a + 1] * wa + p[b + 1] * wb + p[c + 1] * wc;
+      const z = p[a + 2] * wa + p[b + 2] * wb + p[c + 2] * wc;
+      const correction = z - tongueSurfaceLimit(x, y);
+      if (correction <= 0) continue;
+      for (const vertex of [ia, ib, ic]) {
+        const section = Math.floor(vertex / (tongueSides + 1));
+        tongueCorrections[section] = Math.max(tongueCorrections[section], correction);
+      }
+    }
+    let maxCorrection = 0;
+    for (let row = 0; row <= tongueRows; row++) {
+      maxCorrection = Math.max(maxCorrection, tongueCorrections[row]);
+      for (let c = 0; c <= tongueSides; c++) p[(row * (tongueSides + 1) + c) * 3 + 2] -= tongueCorrections[row];
+    }
+    // Preserve a continuous path from the rear tongue to its tip after contact.
+    for (let row = tongueRows - 1; row >= 0; row--) {
+      const z = Math.min(p[row * (tongueSides + 1) * 3 + 2], p[(row + 1) * (tongueSides + 1) * 3 + 2]);
+      for (let c = 0; c <= tongueSides; c++) p[(row * (tongueSides + 1) + c) * 3 + 2] = z;
+    }
+    tongueGeometry.attributes.position.needsUpdate = true;
+    tongueGeometry.computeVertexNormals(); tongueGeometry.computeBoundingSphere();
+    const line = lineGeometry.attributes.position.array;
+    for (let i = 0; i < 25; i++) {
+      const row = mix(0.2, 0.9, i / 24) * tongueRows;
+      const lo = Math.floor(row), hi = Math.min(tongueRows, lo + 1), f = row - lo;
+      const a = (lo * (tongueSides + 1) + tongueSides / 4) * 3;
+      const b = (hi * (tongueSides + 1) + tongueSides / 4) * 3;
+      for (let c = 0; c < 3; c++) line[i * 3 + c] = mix(p[a + c], p[b + c], f);
+      line[i * 3 + 1] -= 0.004;
+    }
+    lineGeometry.attributes.position.needsUpdate = true; lineGeometry.computeBoundingSphere();
+    group.userData.tongueContainment = { margin: tongueMargin, maxCorrection };
+  }
+
   function updateMouth() {
     mouthWidth = clamp((0.37 + state.jawOpen * 0.095 + state.lipSpread * 0.22 + state.smile * 0.1 - state.lipRound * 0.205) * (1 - state.lipClose * 0.13), 0.145, 0.76);
     mouthHeight = (0.014 + state.jawOpen * 0.345 + state.lipRound * 0.12 + state.tongueOut * 0.075) * (1 - state.lipClose * 0.985);
@@ -477,8 +711,7 @@ export function createCharacter() {
         const a = c / sides * Math.PI * 2;
         const p = mouthPoint(a);
         const upper = Math.sin(a) >= 0;
-        const openness = smooth(mouthHeight / 0.15);
-        const thickness = (upper ? mix(0.024, 0.039, openness) : mix(0.03, 0.051, openness)) * (1 + state.lipRound * 0.36);
+        const thickness = lipThickness(upper);
         const nx = Math.cos(a), ny = Math.sin(a);
         lip[index++] = p.x + nx * Math.cos(cross) * thickness;
         lip[index++] = p.y + ny * Math.cos(cross) * thickness;
@@ -521,7 +754,7 @@ export function createCharacter() {
     index = 0;
     for (let row = 0; row <= tongueRows; row++) {
       const t = row / tongueRows;
-      const center = tongueCenter(t), radius = tongueRadius(t);
+      const { center, radius } = fittedTongueRing(t);
       for (let c = 0; c <= tongueSides; c++) {
         const a = c / tongueSides * Math.PI * 2;
         const centerDip = Math.sin(a) > 0 ? 0.008 * Math.exp(-((Math.cos(a) / 0.17) ** 2)) * Math.sin(Math.PI * t) : 0;
@@ -531,16 +764,6 @@ export function createCharacter() {
       }
     }
     tongueGeometry.attributes.position.needsUpdate = true;
-    tongueGeometry.computeVertexNormals(); tongueGeometry.computeBoundingSphere();
-    const lineArray = lineGeometry.attributes.position.array;
-    for (let i = 0; i < 25; i++) {
-      const t = mix(0.2, 0.9, i / 24), center = tongueCenter(t), radius = tongueRadius(t);
-      lineArray[i * 3] = center.x;
-      lineArray[i * 3 + 1] = center.y + radius.height - 0.004;
-      lineArray[i * 3 + 2] = center.z;
-    }
-    lineGeometry.attributes.position.needsUpdate = true;
-    lineGeometry.computeBoundingSphere();
   }
 
   let previous = '';
@@ -549,7 +772,7 @@ export function createCharacter() {
     const signature = keys.map(key => state[key].toFixed(4)).join(',');
     if (signature === previous) return;
     previous = signature;
-    updateMouth(); updateHead(); containDentalArches();
+    updateMouth(); updateHead(); containDentalArches(); containTongue();
     for (const { sign, eye, closed, brow } of eyes) {
       const blink = sign > 0 ? state.blinkLeft : state.blinkRight;
       const raise = sign > 0 ? state.cheekRaiseLeft : state.cheekRaiseRight;
@@ -588,7 +811,7 @@ export function createCharacter() {
     group.userData.wireframe = wireframe;
   }
   function setWireframe(value) { wireframe = Boolean(value); applyAppearance(); }
-  function setCutaway(value) { cutaway = Boolean(value); updateMouth(); containDentalArches(); applyAppearance(); }
+  function setCutaway(value) { cutaway = Boolean(value); updateMouth(); containDentalArches(); containTongue(); applyAppearance(); }
   function dispose() {
     for (const geometry of geometries) geometry.dispose();
     for (const mat of materials) mat.dispose();
