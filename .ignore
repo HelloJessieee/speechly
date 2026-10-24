@@ -1,0 +1,4 @@
+# Keep secrets out of search tools. Git itself uses .gitignore, which also lists these.
+.env
+.env.*
+!.env.example
