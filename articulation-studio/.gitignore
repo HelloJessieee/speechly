@@ -1,0 +1,8 @@
+# Hand-authored web sources are intentionally stored in dist/.
+!dist/
+!dist/**
+
+node_modules/
+.DS_Store
+*.log
+.openai/
