@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { summarizeCapture } from './analysis/summarize'
+import { useFaceTracking } from './analysis/useFaceTracking'
 import { usePrefersReducedMotion } from './animation/usePrefersReducedMotion'
 import type { PlaybackSpeed } from './animation/useTimeline'
 import { AudioPlayback } from './components/AudioPlayback'
@@ -7,10 +9,13 @@ import { FeedbackPanel } from './components/FeedbackPanel'
 import { Icon } from './components/Icon'
 import { LessonGuide } from './components/LessonGuide'
 import { LessonSelector } from './components/LessonSelector'
+import { MouthMeasurements } from './components/MouthMeasurements'
 import { RecorderControls } from './components/RecorderControls'
 import { ReferenceMouth, type AnimationMode } from './components/ReferenceMouth'
 import { lessons, lessonsById } from './data/lessons'
 import { ACTIONS } from './feedback/actions'
+import type { FeedbackApiStatus } from './feedback/api'
+import { claudeFeedbackProvider, fetchClaudeStatus } from './feedback/claudeProvider'
 import { demoFeedbackProvider } from './feedback/demoProvider'
 import type { FeedbackProvider } from './feedback/provider'
 import { useAudioLevel } from './media/useAudioLevel'
@@ -18,10 +23,12 @@ import { useDemoRecorder } from './media/useDemoRecorder'
 import { useMediaCapture } from './media/useMediaCapture'
 import { useRecorder } from './media/useRecorder'
 import { useReferenceAudio } from './speech/useReferenceAudio'
-import type { ActionId, LessonId, PracticeAttempt, PracticeFeedback } from './types'
+import type { ActionId, FeedbackSource, LessonId, PracticeAttempt, PracticeFeedback } from './types'
 
-// Swap this for another FeedbackProvider implementation in a later iteration.
-const feedbackProvider: FeedbackProvider = demoFeedbackProvider
+const PROVIDERS: Record<FeedbackSource, FeedbackProvider> = {
+  claude: claudeFeedbackProvider,
+  demo: demoFeedbackProvider,
+}
 
 const STEPS = ['Choose a lesson', 'Watch the guide', 'Record', 'Replay', 'View feedback', 'Correct & retry']
 
@@ -46,16 +53,35 @@ export default function App() {
   const liveRecorder = useRecorder(media.stream, levelRef)
   const demoRecorder = useDemoRecorder()
   const recorder = practiceMode === 'demo' ? demoRecorder : liveRecorder
+  const tracking = useFaceTracking(practiceMode === 'live' && media.camera === 'ready')
+  const [claudeStatus, setClaudeStatus] = useState<FeedbackApiStatus>({ available: false, model: null })
+  useEffect(() => {
+    void fetchClaudeStatus().then(setClaudeStatus)
+  }, [])
 
   // Attempts and feedback
   const [attempts, setAttempts] = useState<Partial<Record<LessonId, PracticeAttempt[]>>>({})
   const [currentAttempt, setCurrentAttempt] = useState<PracticeAttempt | null>(null)
   const [feedback, setFeedback] = useState<PracticeFeedback | null>(null)
-  const [feedbackLoading, setFeedbackLoading] = useState(false)
+  const [feedbackLoading, setFeedbackLoading] = useState<FeedbackSource | null>(null)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const [viewedCorrection, setViewedCorrection] = useState(false)
   const feedbackRequestRef = useRef(0)
   const referenceRef = useRef<HTMLDivElement>(null)
   const practiceRef = useRef<HTMLElement>(null)
+
+  // Capture lip landmarks for exactly as long as the recorder runs.
+  const captureRef = useRef<ReturnType<typeof tracking.endCapture> | null>(null)
+  const { beginCapture, endCapture } = tracking
+  const isRecording = recorder.status === 'recording'
+  useEffect(() => {
+    if (isRecording) {
+      captureRef.current = null
+      beginCapture()
+      return
+    }
+    captureRef.current = endCapture()
+  }, [isRecording, beginCapture, endCapture])
 
   // Turn each finished recording into a practice attempt.
   const lastRecordingRef = useRef(recorder.recording)
@@ -72,10 +98,13 @@ export default function App() {
       durationMs: recording.durationMs,
       createdAt: Date.now(),
       signal: recording.url ? { peakLevel: recording.peakLevel, usable: !recording.quiet } : undefined,
+      analysis: captureRef.current?.length ? summarizeCapture(captureRef.current, lessonsById[lessonId]) : null,
     }
+    captureRef.current = null
     setAttempts((all) => ({ ...all, [lessonId]: [...(all[lessonId] ?? []), attempt] }))
     setCurrentAttempt(attempt)
     setFeedback(null)
+    setFeedbackError(null)
   }, [recorder.recording, attempts, lessonId])
 
   const resetPractice = useCallback(() => {
@@ -84,7 +113,8 @@ export default function App() {
     demoRecorder.discard()
     setCurrentAttempt(null)
     setFeedback(null)
-    setFeedbackLoading(false)
+    setFeedbackLoading(null)
+    setFeedbackError(null)
   }, [liveRecorder, demoRecorder])
 
   const selectLesson = (id: LessonId) => {
@@ -115,17 +145,33 @@ export default function App() {
     setPracticeMode('off')
   }
 
-  const requestFeedback = async () => {
+  const requestFeedback = async (source: FeedbackSource) => {
     if (!currentAttempt) return
     const requestId = ++feedbackRequestRef.current
-    setFeedbackLoading(true)
+    setFeedbackLoading(source)
+    setFeedbackError(null)
     const history = (attempts[lessonId] ?? []).filter((attempt) => attempt.id !== currentAttempt.id)
-    const result = await feedbackProvider.evaluate({ lesson, attempt: currentAttempt, history, viewedCorrection })
-    if (requestId !== feedbackRequestRef.current) return
-    setFeedback(result)
-    setFeedbackLoading(false)
-    setViewedCorrection(false)
+    try {
+      const result = await PROVIDERS[source].evaluate({ lesson, attempt: currentAttempt, history, viewedCorrection })
+      if (requestId !== feedbackRequestRef.current) return
+      setFeedback(result)
+      setViewedCorrection(false)
+    } catch (error) {
+      if (requestId !== feedbackRequestRef.current) return
+      setFeedbackError(error instanceof Error ? error.message : 'Feedback is unavailable right now.')
+    } finally {
+      if (requestId === feedbackRequestRef.current) setFeedbackLoading(null)
+    }
   }
+
+  // Why Claude feedback can't be used for the current attempt, if it can't.
+  const claudeUnavailableReason = !claudeStatus.available
+    ? 'Claude feedback is not set up on this server.'
+    : !currentAttempt?.analysis
+      ? 'Claude feedback needs the camera on while you record.'
+      : !currentAttempt.analysis.usable
+        ? 'Your face was not visible clearly enough. Center your face in the oval and try again.'
+        : null
 
   const runAction = (actionId: ActionId) => {
     const { behavior } = ACTIONS[actionId]
@@ -241,11 +287,13 @@ export default function App() {
                   onStart={startMedia}
                   onDemo={startDemo}
                   onStop={stopPractice}
+                  tracking={tracking}
                 />
                 <RecorderControls recorder={recorder} mode={practiceMode} level={level} lessonText={lesson.text} />
                 {recorder.recording && (
                   <AudioPlayback recording={recorder.recording} message={recorder.message} onDiscard={resetPractice} />
                 )}
+                {currentAttempt?.analysis && <MouthMeasurements analysis={currentAttempt.analysis} />}
               </section>
 
               <FeedbackPanel
@@ -253,6 +301,8 @@ export default function App() {
                 attempt={currentAttempt}
                 feedback={feedback}
                 loading={feedbackLoading}
+                error={feedbackError}
+                claudeUnavailableReason={claudeUnavailableReason}
                 onRequest={requestFeedback}
                 onAction={runAction}
                 onTryAgain={tryAgain}

@@ -21,6 +21,7 @@ export const lessons: Lesson[] = [
       { at: 3200, shape: 'rest', caption: 'Return to rest.' },
     ],
     tip: 'Keep the lip contact light — a soft touch is enough for /m/.',
+    visualChecks: ['closure', 'spread'],
     correction: {
       actionId: 'practice_lip_closure',
       instruction: 'Let your lips meet softly for /m/, then open into “ee.”',
@@ -63,6 +64,7 @@ export const lessons: Lesson[] = [
       { at: 3600, shape: 'rest', caption: 'Return to rest.' },
     ],
     tip: 'Think of a gentle, small circle — comfortable, not tight.',
+    visualChecks: ['closure', 'rounding'],
     correction: {
       actionId: 'practice_rounded_shape',
       instruction: 'Try gently rounding your lips while practicing /u/.',
@@ -106,6 +108,7 @@ export const lessons: Lesson[] = [
       { at: 4000, shape: 'rest', caption: 'Return to rest.' },
     ],
     tip: 'The contact is light. Your lower lip simply meets the edge of your upper teeth.',
+    visualChecks: ['lipTeeth'],
     correction: {
       actionId: 'practice_lip_teeth_position',
       instruction: 'Try resting your upper teeth lightly on your lower lip for /f/.',
@@ -148,6 +151,7 @@ export const lessons: Lesson[] = [
       { at: 2800, shape: 'rest', caption: 'Return to rest.' },
     ],
     tip: 'Hold a tissue or your hand near your mouth — you may feel a small puff of air on /p/.',
+    visualChecks: ['closure', 'spread'],
     correction: {
       actionId: 'practice_lip_closure',
       instruction: 'Close your lips gently, then release them with a light puff of air for /p/.',
@@ -190,6 +194,7 @@ export const lessons: Lesson[] = [
       { at: 2800, shape: 'rest', caption: 'Return to rest.' },
     ],
     tip: 'Place your fingers lightly on your throat — you may feel a gentle buzz on /b/ that you will not feel on /p/.',
+    visualChecks: ['closure', 'spread'],
     correction: {
       actionId: 'practice_lip_closure',
       instruction: 'Close your lips gently and let your voice start as they part for /b/.',
@@ -235,6 +240,7 @@ export const lessons: Lesson[] = [
       { at: 4500, shape: 'rest', caption: 'Return to rest.' },
     ],
     tip: 'Say it as one smooth phrase. The lips only need to close once, for /m/.',
+    visualChecks: ['closure', 'spread'],
     correction: {
       actionId: 'replay_reference',
       instruction: 'Watch the sequence slowly: notice the lips close once, for /m/, between the two “ee” sounds.',

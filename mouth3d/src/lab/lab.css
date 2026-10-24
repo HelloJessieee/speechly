@@ -1,0 +1,248 @@
+@import 'tailwindcss';
+
+@theme {
+  /* SF Pro on Apple devices; bundled Nunito everywhere else. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Nunito Variable', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+
+  --color-cream: #f6f1e8;
+  /* Translucent fills so surfaces read as glass over the backdrop. */
+  --color-paper: rgb(255 255 255 / 0.62);
+  --color-sand: #ffffff;
+  --color-line: rgb(29 59 44 / 0.12);
+  --color-ink: #1d3b2c;
+  --color-ink-soft: #3f5a49;
+  --color-sage: #3f7d5c;
+  --color-sage-dark: #2f6447;
+  --color-sage-soft: #d6eadb;
+  --color-sky: #2f6690;
+  --color-sky-soft: #d8e7f3;
+  --color-amber-soft: #f7ead0;
+  --color-amber-ink: #6a4a12;
+  --color-rec: #b42318;
+  --color-rec-soft: #fde8e5;
+
+  --glass-blur: blur(28px) saturate(180%);
+}
+
+@layer base {
+  html {
+    background: var(--color-cream);
+    color: var(--color-ink);
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    margin: 0;
+    min-width: 320px;
+    font-family: var(--font-sans);
+    background: var(--color-cream);
+    isolation: isolate;
+  }
+  /* Soft, colorful backdrop that the glass surfaces blur and tint. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: -10vmax;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(40rem 32rem at 6% 4%, rgb(118 190 146 / 0.75), transparent 62%),
+      radial-gradient(36rem 30rem at 94% 8%, rgb(124 176 228 / 0.75), transparent 62%),
+      radial-gradient(42rem 34rem at 76% 94%, rgb(246 192 140 / 0.7), transparent 62%),
+      radial-gradient(32rem 28rem at 12% 90%, rgb(150 206 186 / 0.7), transparent 62%)
+      ,radial-gradient(24rem 20rem at 46% 60%, rgb(170 200 236 / 0.45), transparent 65%),
+      radial-gradient(26rem 22rem at 50% 45%, rgb(255 236 210 / 0.7), transparent 70%),
+      var(--color-cream);
+    animation: mc-drift 40s ease-in-out infinite alternate;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-sky);
+    outline-offset: 2px;
+    border-radius: 12px;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/*
+ * Liquid Glass surface: translucent fill, backdrop blur and saturation, a
+ * bright specular edge along the top, and a light-catching rim drawn with a
+ * masked gradient border.
+ */
+@utility glass {
+  position: relative;
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.66) 0%, rgb(255 255 255 / 0.36) 100%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.95),
+    inset 0 -1px 1px rgb(255 255 255 / 0.3),
+    0 1px 2px rgb(29 59 44 / 0.06),
+    0 20px 44px -20px rgb(29 59 44 / 0.3);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      135deg,
+      rgb(255 255 255 / 0.95),
+      rgb(255 255 255 / 0.2) 35%,
+      rgb(29 59 44 / 0.08) 60%,
+      rgb(255 255 255 / 0.75)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+  }
+}
+
+@utility card {
+  @apply glass rounded-[28px] p-5 sm:p-6;
+}
+
+@utility btn {
+  @apply relative inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 py-2.5 text-base font-semibold transition-[transform,background-color,box-shadow] duration-200 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100;
+}
+
+/* Tinted glass: a colored, still slightly translucent capsule. */
+@utility btn-primary {
+  @apply btn text-white;
+  background: linear-gradient(180deg, rgb(63 125 92 / 0.94), rgb(42 92 65 / 0.96));
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.5),
+    inset 0 -1px 1px rgb(0 0 0 / 0.15),
+    0 8px 22px -10px rgb(42 92 65 / 0.7);
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgb(56 115 84 / 0.96), rgb(36 82 57 / 0.98));
+  }
+}
+
+@utility btn-record {
+  @apply btn text-white;
+  background: linear-gradient(180deg, rgb(196 48 36 / 0.94), rgb(160 30 22 / 0.96));
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.45),
+    inset 0 -1px 1px rgb(0 0 0 / 0.15),
+    0 8px 22px -10px rgb(160 30 22 / 0.7);
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgb(180 40 30 / 0.96), rgb(140 26 18 / 0.98));
+  }
+}
+
+/* Clear glass capsule. */
+@utility btn-secondary {
+  @apply btn text-ink;
+  background: rgb(255 255 255 / 0.5);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.95),
+    inset 0 0 0 1px rgb(255 255 255 / 0.55),
+    0 0 0 1px rgb(29 59 44 / 0.1),
+    0 6px 16px -10px rgb(29 59 44 / 0.35);
+
+  &:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.78);
+  }
+}
+
+@utility btn-quiet {
+  @apply btn px-4 text-ink-soft hover:bg-white/55 hover:text-ink;
+}
+
+/* Segmented control: recessed track with a raised glass thumb. */
+@utility seg-track {
+  @apply rounded-full p-1;
+  background: rgb(29 59 44 / 0.07);
+  box-shadow:
+    inset 0 1px 2px rgb(29 59 44 / 0.1),
+    inset 0 -1px 0 rgb(255 255 255 / 0.6);
+}
+
+@utility seg-item {
+  @apply min-h-9 rounded-full px-3 font-semibold text-ink-soft transition-[background-color,box-shadow,color] duration-200 hover:text-ink;
+
+  &[aria-pressed='true'] {
+    color: var(--color-ink);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.75));
+    box-shadow:
+      inset 0 1px 0.5px rgb(255 255 255 / 1),
+      0 0 0 0.5px rgb(29 59 44 / 0.08),
+      0 3px 10px -3px rgb(29 59 44 / 0.3);
+  }
+}
+
+@utility eyebrow {
+  @apply text-xs font-bold tracking-[0.12em] text-ink-soft uppercase;
+}
+
+@keyframes mc-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.mc-pulse {
+  animation: mc-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes mc-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-3vmax, 2vmax, 0) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Solid surfaces when transparency is reduced or blur is unsupported. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .card {
+    background: #fbf8f2 !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .card {
+    background: #fbf8f2;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .glass,
+  .card {
+    background: #ffffff;
+    outline: 1px solid rgb(29 59 44 / 0.45);
+  }
+}

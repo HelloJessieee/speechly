@@ -1,0 +1,1 @@
+{"root":["./src/lab/Lab.tsx","./src/lab/MouthIllustration2D.tsx","./src/lab/main.tsx","./src/lab/progress.ts","./src/lab/useTimeline.ts","./src/model/MouthModel3D.tsx","./src/model/lessons.ts","./src/model/rig.ts","./src/model/shapes.ts","./src/model/surface.ts","./src/model/types.ts","./src/model/viewer.ts","./vite.config.ts"],"version":"6.0.3"}

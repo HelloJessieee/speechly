@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
+import type { FaceTracking } from '../analysis/useFaceTracking'
 import type { DeviceStatus } from '../media/useMediaCapture'
 import { Icon } from './Icon'
 import { StatusPill } from './StatusPill'
@@ -14,11 +15,12 @@ interface CameraPreviewProps {
   onStart: () => void
   onDemo: () => void
   onStop: () => void
+  tracking: FaceTracking
 }
 
 /** Mirrored camera preview with a simple positioning guide. */
-export function CameraPreview({ mode, stream, camera, microphone, errorMessage, onStart, onDemo, onStop }: CameraPreviewProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+export function CameraPreview({ mode, stream, camera, microphone, errorMessage, onStart, onDemo, onStop, tracking }: CameraPreviewProps) {
+  const { videoRef, overlayRef } = tracking
   const hasVideo = camera === 'ready' && (stream?.getVideoTracks().length ?? 0) > 0
   const requesting = camera === 'requesting' || microphone === 'requesting'
   const failed = mode === 'live' && !requesting && !stream
@@ -28,7 +30,7 @@ export function CameraPreview({ mode, stream, camera, microphone, errorMessage, 
     if (!video) return
     video.srcObject = hasVideo ? stream : null
     if (hasVideo) void video.play().catch(() => {})
-  }, [stream, hasVideo])
+  }, [stream, hasVideo, videoRef])
 
   return (
     <div className="flex flex-col gap-3">
@@ -43,6 +45,8 @@ export function CameraPreview({ mode, stream, camera, microphone, errorMessage, 
               aria-label="Your camera preview, mirrored"
               className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
             />
+            <canvas ref={overlayRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full -scale-x-100 object-cover" />
+            <TrackingBadge tracking={tracking} />
             <svg viewBox="0 0 400 300" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
               <ellipse cx="200" cy="140" rx="92" ry="118" fill="none" stroke="#fffdf9" strokeWidth="3" strokeDasharray="8 7" opacity="0.9" />
               <path d="M165 192 Q200 210 235 192" fill="none" stroke="#fffdf9" strokeWidth="3" strokeLinecap="round" opacity="0.9" />
@@ -139,5 +143,31 @@ export function CameraPreview({ mode, stream, camera, microphone, errorMessage, 
         )}
       </div>
     </div>
+  )
+}
+
+function TrackingBadge({ tracking }: { tracking: FaceTracking }) {
+  const text =
+    tracking.status === 'loading'
+      ? 'Loading lip tracking…'
+      : tracking.status === 'error'
+        ? 'Lip tracking unavailable'
+        : tracking.status === 'ready'
+          ? tracking.faceFound
+            ? 'Tracking your lips'
+            : 'Face not found — move into the oval'
+          : null
+  if (!text) return null
+  const good = tracking.status === 'ready' && tracking.faceFound
+  return (
+    <p
+      role="status"
+      className={`absolute top-3 left-3 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold backdrop-blur-md ${
+        good ? 'bg-sage-soft/85 text-sage-dark' : 'bg-white/80 text-ink-soft'
+      }`}
+    >
+      <span aria-hidden="true" className={`size-2 rounded-full ${good ? 'bg-sage' : 'mc-pulse bg-amber-ink'}`} />
+      {text}
+    </p>
   )
 }

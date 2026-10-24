@@ -55,6 +55,9 @@ export interface DemoFeedbackContent {
   acknowledgement: { practiceFocus: string; tip: string }
 }
 
+/** Visible movements that can be measured from face landmarks. */
+export type VisualCheckId = 'closure' | 'rounding' | 'spread' | 'lipTeeth'
+
 export interface Lesson {
   id: LessonId
   text: string
@@ -68,6 +71,8 @@ export interface Lesson {
   note?: string
   correction: CorrectionGuide
   demoFeedback: DemoFeedbackContent
+  /** Movements the landmark analysis checks for this lesson. */
+  visualChecks: VisualCheckId[]
 }
 
 export type AttemptSource = 'recording' | 'demo'
@@ -85,19 +90,83 @@ export interface PracticeAttempt {
    * never whether the word was pronounced correctly.
    */
   signal?: { peakLevel: number; usable: boolean }
+  /** Lip measurements from face landmarks, when the camera was on. */
+  analysis?: MouthAnalysis | null
 }
 
-export type FeedbackStatus = 'suggestion' | 'acknowledged'
+// ---------------------------------------------------------------------------
+// Mouth analysis (computed locally in the browser from face landmarks)
+
+export type CheckResult = 'detected' | 'unclear' | 'not_detected'
+
+export interface VisualCheck {
+  id: VisualCheckId
+  result: CheckResult
+  /** Plain-language summary shown to the learner. */
+  summary: string
+  /** Seconds from the start of the recording, when relevant. */
+  atSeconds?: number
+  /** Raw measurement for the feedback provider (ratio to the learner's own rest shape, etc.). */
+  value?: number
+}
+
+export interface MouthSample {
+  /** Seconds from the start of the recording. */
+  t: number
+  /** Inner-lip opening / face width. */
+  opening: number
+  /** Mouth width relative to the learner's rest width (1 = rest). */
+  width: number
+  /** Visible lower-lip thickness relative to rest (lower = lip tucked in). */
+  lowerLip: number
+  /** Lip protrusion relative to rest, in face widths (positive = forward). */
+  protrusion: number
+}
+
+export interface MouthSnapshot {
+  label: string
+  t: number
+  /** JPEG data URL of a mouth-only crop (unmirrored). */
+  dataUrl: string
+}
+
+export interface MouthAnalysis {
+  /** Share of recorded frames where a face was found (0–1). */
+  faceVisible: number
+  frames: number
+  durationSeconds: number
+  /** Seconds where visible speech movement starts and ends. */
+  speech: { start: number; end: number } | null
+  rest: { opening: number; widthFaceUnits: number }
+  checks: VisualCheck[]
+  /** Downsampled timeline across the recording. */
+  timeline: MouthSample[]
+  snapshots: MouthSnapshot[]
+  /** False when tracking was too poor to say anything. */
+  usable: boolean
+}
+
+export type FeedbackStatus = 'suggestion' | 'acknowledged' | 'on_track' | 'insufficient_data'
+export type FeedbackSource = 'demo' | 'claude'
 
 export interface PracticeFeedback {
-  source: 'demo'
+  source: FeedbackSource
   lessonId: LessonId
   status: FeedbackStatus
   practiceFocus: string
   tip: string
   actionId: ActionId
-  isIllustrative: true
-  /** Human-readable label for the scripted scenario, e.g. "Example 1 of 2". */
-  scenarioLabel: string
+  /** True for scripted demo feedback that ignores the attempt. */
+  isIllustrative: boolean
+  /** Label for the scripted scenario, e.g. "Example 1 of 2". Demo only. */
+  scenarioLabel?: string
+  /** What was visible in the attempt, hedged. Null when nothing reliable was seen. */
+  observation?: string | null
+  /** Short references to the measurements or snapshots behind the observation. */
+  evidence?: string[]
+  /** How this attempt differs from the previous one, when there is one. */
+  comparedToPrevious?: string | null
+  /** Model that produced the feedback, for non-demo sources. */
+  model?: string
   attemptId: string
 }

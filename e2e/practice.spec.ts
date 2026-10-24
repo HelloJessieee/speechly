@@ -8,7 +8,8 @@ const lessonButton = (page: Page, text: string) =>
 test.beforeEach(async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  page.on('console', (msg) => msg.type() === 'error' && errors.push(msg.text()))
+  // MediaPipe reports informational messages through console.error; ignore those.
+  page.on('console', (msg) => msg.type() === 'error' && !msg.text().startsWith('INFO:') && errors.push(msg.text()))
   ;(page as unknown as { errors: string[] }).errors = errors
   await page.goto('/')
 })
@@ -83,7 +84,7 @@ test('demo mode: full flow without permissions, correction and retry', async ({ 
   await expect(page.getByText('not an observation about you')).toBeVisible()
 
   await page.getByRole('button', { name: 'Try again' }).click()
-  await expect(page.getByText('to see example feedback')).toBeVisible()
+  await expect(page.getByText('to get feedback')).toBeVisible()
   await expect(page.getByText('Demo attempt — no audio was captured')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Record (demo)' }).click()
