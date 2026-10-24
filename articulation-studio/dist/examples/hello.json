@@ -1,0 +1,13 @@
+{
+  "version": "0.1",
+  "name": "Hello · 口形节奏示意",
+  "description": "仅演示可控口形与动作时序，不含语音或音频对齐。",
+  "frames": [
+    { "viseme": "neutral", "duration": 250 },
+    { "viseme": "aa", "duration": 170 },
+    { "viseme": "eh", "duration": 300 },
+    { "viseme": "l", "duration": 250 },
+    { "viseme": "oh", "duration": 480 },
+    { "viseme": "neutral", "duration": 350 }
+  ]
+}

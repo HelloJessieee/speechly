@@ -1,0 +1,18 @@
+{
+  "version": "0.1",
+  "name": "独立动作通道演示",
+  "description": "依次演示嘴唇、舌头和脸颊控制，所有数值均为示意强度。左右指角色自身的左右。",
+  "frames": [
+    { "viseme": "neutral", "duration": 300 },
+    { "pose": { "jawOpen": 0.55, "lipSpread": 0.35, "lowerLipDepress": 0.18 }, "duration": 650 },
+    { "pose": { "tongueOut": 0.65, "tongueUp": 0.25 }, "duration": 700 },
+    { "pose": { "tongueLeft": 0.65 }, "duration": 550 },
+    { "pose": { "tongueLeft": -0.65 }, "duration": 550 },
+    { "pose": { "tongueLeft": 0, "tongueOut": 0.2, "tongueUp": 0.85 }, "duration": 650 },
+    { "viseme": "oo", "duration": 600 },
+    { "pose": { "cheekPuffLeft": 0.75, "cheekPuffRight": 0.75, "lipClose": 0.8 }, "duration": 750 },
+    { "viseme": "neutral", "duration": 350 },
+    { "pose": { "smile": 0.8, "cheekRaiseLeft": 0.65, "cheekRaiseRight": 0.65, "blinkLeft": 0.8 }, "duration": 650 },
+    { "viseme": "neutral", "duration": 500 }
+  ]
+}

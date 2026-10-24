@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#eff3ee">
+<title>口型实验室 · Articulation Studio</title>
+<meta name="description" content="可交互的三维卡通发音模型。独立控制舌头、嘴唇、脸颊和下颌，并通过统一接口接入发音项目。">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body>
+<div class="app-shell">
+<header class="topbar">
+<a class="brand" href="./" aria-label="口型实验室首页"><span class="brand-symbol"><i></i><i></i><i></i><i></i><i></i></span><span>口型实验室<small>ARTICULATION STUDIO</small></span></a>
+<nav aria-label="主导航"><button class="nav-link active">模型工作台<span>01</span></button><button class="nav-link" id="docsButton">接入文档<svg viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"/></svg></button></nav>
+<div class="project-badge"><span></span>发音项目 · 原型 v0.1</div>
+</header>
+<main>
+<section class="intro"><div><div class="eyebrow">A LITTLE FACE. A WORLD OF SOUNDS.</div><h1>发音，从看见开始<span>。</span></h1><p>让舌头、嘴唇与脸颊的每一次运动，都清晰可控。</p></div><button id="referenceButton" class="text-button">查看造型参考 <span>↗</span></button></section>
+<div class="workspace">
+<section class="preview-panel" aria-label="三维模型预览">
+<div class="preview-top"><div><span class="mini-label">CHARACTER / 001</span><h2>小言 <span>Xiaoyan</span></h2></div><span class="live-pill"><i></i>实时模型</span></div>
+<div id="viewport"><div id="loading" role="status"><span class="loader"></span>正在唤醒小言…</div></div>
+<div class="viewport-tools"><button class="icon-button" id="zoomIn" aria-label="放大模型" title="放大模型">＋</button><button class="icon-button" id="zoomOut" aria-label="缩小模型" title="缩小模型">−</button><span></span><button class="icon-button" id="resetCamera" aria-label="重置视角" title="重置视角">↺</button><button class="icon-button" id="fullscreen" aria-label="全屏预览" title="全屏预览">⛶</button></div>
+<div class="model-note"><span class="note-dot"></span><span>拖动旋转 · 滚轮缩放</span></div>
+<div class="preview-bottom"><div class="views" role="group" aria-label="选择视角"><button class="selected" data-view="front">正面</button><button data-view="threequarter">¾ 侧面</button><button data-view="side">侧面</button></div><div class="view-toggles"><button id="cutawayButton" class="toggle-button" aria-pressed="false"><span class="toggle-indicator"></span>透视口腔</button><button id="wireButton" class="wire-button" aria-pressed="false" title="显示模型网格">网格</button></div></div>
+</section>
+<aside class="controls-panel" aria-label="运动控制">
+<div class="panel-heading"><div><span class="mini-label">RIG CONTROLS</span><h2>运动控制</h2></div><button id="resetPose" class="reset-button">↺ 复位</button></div>
+<div class="control-tabs" role="tablist" aria-label="控制部位"><button role="tab" aria-selected="true" data-group="lips" class="selected">嘴唇 / 下颌</button><button role="tab" aria-selected="false" data-group="tongue">舌头</button><button role="tab" aria-selected="false" data-group="cheeks">脸颊 / 表情</button></div>
+<div id="sliders" role="tabpanel"></div>
+<div class="control-footer"><span class="connected-dot"></span><span><strong id="channelCount">17</strong> 个独立通道</span><button id="exportPose">导出姿态 <span>↗</span></button></div>
+</aside>
+</div>
+<section class="presets-section"><div class="section-title"><div><span class="mini-label">VISEME LIBRARY</span><h2>从一个声音开始</h2></div><span class="section-caption">选择口型，观察发音动作</span></div><div id="presets" class="preset-grid" aria-label="发音口型预设"></div><div id="presetHint" class="preset-hint"><span>●</span>自然放松，回到初始口型。</div></section>
+<section class="sequence-section"><div class="sequence-label"><span class="sequence-icon">▥</span><div><h3>让口型连起来</h3><p>口型序列演示 · 无音频</p></div></div><div class="sequence-picker"><label class="sr-only" for="sequenceSelect">演示短句</label><select id="sequenceSelect"><option value="hello">hello</option><option value="goodMorning">good morning</option></select><div id="sequenceTrack" class="sequence-track"></div></div><label class="speed-select"><span>速度</span><select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option></select></label><button id="playSequence" class="primary-button"><span id="playIcon">▶</span><span id="playLabel">播放动作</span></button></section>
+<div class="integration-strip"><div><span class="code-icon">&lt;/&gt;</span><p><strong>为你的发音项目准备就绪</strong><span>统一参数接口 · 平滑过渡 · JSON 动作序列</span></p></div><button id="apiButton">查看控制接口 <span>↗</span></button></div>
+<footer><span>口型实验室 <span class="footer-divider">/</span> 让声音有迹可循</span><span>程序化三维原型 · 口型为示意，可按项目继续校准</span></footer>
+</main>
+</div>
+<dialog id="docsDialog"><div class="dialog-header"><div><span class="mini-label">DEVELOPER HANDOFF</span><h2>连接你的发音项目</h2></div><button class="dialog-close" data-close aria-label="关闭文档">×</button></div><p class="dialog-intro">网页加载完成后，通过 <code>window.articulation</code> 控制模型。参数使用 0–1；<code>tongueLeft</code> 使用 −1–1。</p><div class="doc-tabs"><button class="selected" data-doc="pose">控制姿态</button><button data-doc="viseme">切换口型</button><button data-doc="sequence">播放序列</button></div><pre id="apiCode"></pre><div class="doc-actions"><button id="copyCode" class="secondary-button">复制代码</button><button id="downloadConfig" class="secondary-button">下载接口说明</button><button id="importSequence" class="secondary-button">导入动作 JSON</button><input type="file" id="sequenceFile" accept=".json,application/json" hidden></div><div class="doc-callout"><strong>准备接入时</strong><p>将音素时间点映射到口型预设；也可以逐帧输入舌头、嘴唇和脸颊参数。当前为可操作的视觉原型，尚未绑定语音识别或自动音频对齐。</p></div><details><summary>所有控制参数 <span>展开查看</span></summary><div id="schemaTable"></div></details></dialog>
+<dialog id="referenceDialog"><div class="dialog-header"><div><span class="mini-label">CHARACTER REFERENCE</span><h2>造型与口型参考</h2></div><button class="dialog-close" data-close aria-label="关闭参考图">×</button></div><img src="assets/reference.png" alt="用户提供的卡通男孩多角度表情和口型参考"><p class="reference-caption">保留圆脸、棕色短发、大眼睛及蓝色连帽衫的造型方向。当前模型是基于参考图建立的程序化三维原型。</p></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="app.js?rev=teeth-2"></script>
+</body></html>
