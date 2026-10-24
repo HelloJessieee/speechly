@@ -4,10 +4,18 @@ import Observation
 import UIKit
 import Vision
 
+/// Normalized, unmirrored Vision points from the current camera frame.
+struct LiveLipGeometry: Equatable {
+    var outer: [CGPoint]
+    var inner: [CGPoint]
+    var center: CGPoint
+    var width: CGFloat
+}
+
 /// Front camera session plus on-device lip tracking with Apple's Vision
 /// framework. While capturing, each processed frame stores lip measurements
-/// and a small mouth-only JPEG crop. Nothing leaves the device unless the
-/// learner asks for Claude feedback.
+/// and a small mouth-only JPEG crop. The user may request separate network
+/// feedback or audio analysis from a configured service.
 @MainActor
 @Observable
 final class CameraController {
@@ -15,6 +23,7 @@ final class CameraController {
 
     private(set) var status: Status = .notRequested
     private(set) var faceFound = false
+    private(set) var liveLips: LiveLipGeometry?
 
     let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "mouthcoach.camera.session")
@@ -23,7 +32,13 @@ final class CameraController {
 
     init() {
         processor.onFaceFound = { [weak self] found in
-            Task { @MainActor in self?.faceFound = found }
+            Task { @MainActor in
+                self?.faceFound = found
+                if !found { self?.liveLips = nil }
+            }
+        }
+        processor.onLips = { [weak self] lips in
+            Task { @MainActor in self?.liveLips = lips }
         }
     }
 
@@ -58,6 +73,7 @@ final class CameraController {
         let session = self.session
         sessionQueue.async { if session.isRunning { session.stopRunning() } }
         faceFound = false
+        liveLips = nil
         if status == .ready { status = .notRequested }
     }
 
@@ -100,6 +116,7 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
     let queue = DispatchQueue(label: "mouthcoach.camera.frames")
     /// Called on the video queue.
     var onFaceFound: (@Sendable (Bool) -> Void)?
+    var onLips: (@Sendable (LiveLipGeometry?) -> Void)?
 
     private let ciContext = CIContext()
     private let minInterval: TimeInterval = 1.0 / 15
@@ -142,6 +159,7 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
 
         var features: FrameFeatures?
         var crop: String?
+        var liveLips: LiveLipGeometry?
         if let landmarks = face?.landmarks,
            let outer = landmarks.outerLips?.pointsInImage(imageSize: CGSize(width: width, height: height)),
            let inner = landmarks.innerLips?.pointsInImage(imageSize: CGSize(width: width, height: height)),
@@ -152,6 +170,14 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
             let outerPoints = outer.map(flip)
             let left = outerPoints.min { $0.x < $1.x }!
             let right = outerPoints.max { $0.x < $1.x }!
+            let top = outerPoints.map(\.y).min() ?? 0
+            let bottom = outerPoints.map(\.y).max() ?? 0
+            liveLips = LiveLipGeometry(
+                outer: outerPoints.map { CGPoint(x: $0.x / width, y: $0.y / height) },
+                inner: inner.map(flip).map { CGPoint(x: $0.x / width, y: $0.y / height) },
+                center: CGPoint(x: (left.x + right.x) / (2 * width), y: (top + bottom) / (2 * height)),
+                width: (right.x - left.x) / width
+            )
             let contourXs = contour.map { Double($0.x) }
             features = describeFrame(LipLandmarks(
                 outerLips: outerPoints,
@@ -165,6 +191,7 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
         }
 
         let found = features != nil
+        onLips?(liveLips)
         if found != lastFaceFound {
             lastFaceFound = found
             onFaceFound?(found)

@@ -37,3 +37,9 @@ ios/corechecks
 xcuserdata/
 DerivedData/
 .swiftpm/
+
+# Local Mac inference service assets
+mac_service/.venv/
+mac_service/models/
+**/__pycache__/
+*.pyc

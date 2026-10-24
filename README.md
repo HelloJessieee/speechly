@@ -104,7 +104,10 @@ level only) is shown separately from the feedback. The app shows no scores, perc
 
 ## iOS app
 
-`ios/` contains a native SwiftUI version for iPhone and iPad, ready to open in Xcode. See [ios/README.md](ios/README.md).
+`ios/` contains a native SwiftUI version for iPhone and iPad with three swipeable
+Practice, Mouth Guide, and Results pages. Its English free speech flow uses the
+included [Mac analysis service](mac_service/README.md) on port 8765. See
+[ios/README.md](ios/README.md) for the Xcode and iPhone setup.
 
 ## Reserved for later development
 

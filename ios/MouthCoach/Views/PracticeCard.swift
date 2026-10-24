@@ -5,9 +5,28 @@ struct PracticeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Eyebrow(text: "Your practice")
+            Eyebrow(text: "Live camera")
+            if model.freeSpeechMode && !model.customReference {
+                Text("Say a sentence. Confirm the transcript to add the yellow reference outline.")
+                    .font(.subheadline).foregroundStyle(Color.mcInkSoft)
+            } else {
+                Picker("Lip outline", selection: Binding(get: { model.lipOverlayMode }, set: { model.lipOverlayMode = $0 })) {
+                    ForEach(LipOverlayMode.allCases, id: \.self) { mode in Text(mode.rawValue).tag(mode) }
+                }
+                .pickerStyle(.segmented)
+                Text("Yellow: looping guide · Blue: measured lips")
+                    .font(.caption).foregroundStyle(Color.mcInkSoft)
+            }
+            if model.customReference || !model.freeSpeechMode {
+                Text("Guide word: \(model.currentReferenceWord ?? "pause")")
+                    .font(.subheadline.bold()).foregroundStyle(Color.mcAmberInk)
+            }
             preview
             if model.practiceMode == .live { statusRow }
+            if model.practiceMode == .live && !model.camera.faceFound && model.lipOverlayMode.showsReference {
+                Text("The yellow outline centers until your lips are detected, then follows their size and position.")
+                    .font(.caption).foregroundStyle(Color.mcInkSoft)
+            }
             if model.practiceMode != .off {
                 Button(model.practiceMode == .demo ? "Exit demo mode" : "Turn off camera & mic", systemImage: "power") { model.stopPractice() }
                     .font(.subheadline)
@@ -16,7 +35,6 @@ struct PracticeCard: View {
             }
             RecorderControls()
             if let recording = model.recorder.recording { playback(recording) }
-            if let analysis = model.currentAttempt?.analysis { MeasurementsView(analysis: analysis) }
         }
         .padding(18)
         .glassCard()
@@ -31,7 +49,8 @@ struct PracticeCard: View {
                     Image(systemName: "camera").font(.title).foregroundStyle(Color.mcSage)
                     Button("Start camera & microphone", systemImage: "camera") { model.startCamera() }.primaryButton()
                     Button("Try demo mode") { model.startDemo() }.secondaryButton()
-                    Text("Recordings stay on this device.").font(.caption).foregroundStyle(Color.mcInkSoft)
+                    Text("Free speech audio goes to your Mac for recognition after recording.")
+                        .font(.caption).foregroundStyle(Color.mcInkSoft)
                 }
                 .padding()
             case .demo:
@@ -55,6 +74,9 @@ struct PracticeCard: View {
             ZStack(alignment: .top) {
                 CameraPreviewView(session: model.camera.session)
                     .accessibilityLabel("Your camera preview, mirrored")
+                LiveMouthOverlay(lips: model.camera.liveLips,
+                                 params: model.player.sample.params,
+                                 mode: model.lipOverlayMode)
                 Ellipse()
                     .strokeBorder(.white.opacity(0.9), style: StrokeStyle(lineWidth: 3, dash: [8, 7]))
                     .padding(.horizontal, 60)
@@ -167,7 +189,9 @@ struct RecorderControls: View {
             }
             switch recorder.status {
             case .recording:
-                Text("Recording… say “\(model.lesson.text)”.").font(.subheadline).foregroundStyle(Color.mcInkSoft)
+                Text(model.freeSpeechMode && model.referenceText.isEmpty
+                     ? "Recording… say an English sentence." : "Recording… say “\(model.referenceText)”.")
+                    .font(.subheadline).foregroundStyle(Color.mcInkSoft)
             case .unusable:
                 Text("That recording was too short or empty. Try recording for at least one second.").font(.subheadline.bold()).foregroundStyle(Color.mcAmberInk)
             case .denied:

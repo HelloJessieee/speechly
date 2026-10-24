@@ -17,6 +17,47 @@ open MouthCoach.xcodeproj
 In Xcode, select the **MouthCoach** target → **Signing & Capabilities**, choose your team, then run on a simulator or a device.
 The camera, microphone and lip tracking need a real device; the Simulator has no camera, but demo mode works there.
 
+## Speech Mirror integration
+
+The native iPhone app has three horizontally swipeable pages: **Practice** for
+camera, recording, and transcript confirmation; **Mouth Guide** for the looping
+sentence reference and live lip overlay; and **Results** for voice measurements,
+tentative phoneme comparison, and Gemma suggestions. The pages also have a
+bottom navigation bar. All app-facing labels and analysis messages are English.
+
+The app uses the sentence reference and audio analysis in `mac_service/`
+without replacing this app's SwiftUI camera, recorder, or seven mouth shapes.
+Select **Yellow**, **Blue**, or **Both** on Mouth Guide.
+Yellow is a looping reference contour attached to the detected lip center and
+scaled to lip width; blue traces the measured lips. The current reference word
+is shown beside both views. These visual shapes and timing are illustrative.
+
+Preset lessons and live lip tracking run on the iPhone. For an arbitrary English
+sentence or Whisper / phoneme / Gemma analysis, set up and start the included
+Python service on the Mac (see [mac_service/README.md](../mac_service/README.md)):
+
+```bash
+cd mac_service
+.venv/bin/python -m speech_mirror.web --host 0.0.0.0 --port 8765
+```
+
+This test build defaults to `http://172.20.10.13:8765` for Speech Mirror requests.
+Open the gear icon in the app and save your Mac's current LAN address with port
+8765 if it differs. Both devices must be
+on the same trusted network. The app opens in free speech mode: record an
+English phrase, wait for automatic Whisper recognition, correct the proposed
+text if needed, then tap **Confirm sentence**. This generates the looping
+reference and returns basic voice measurements. On Results, run the experimental
+phoneme model for a single word or tap **Ask Gemma for a suggestion** separately.
+Those models may take longer to load. Audio is sent to the
+configured Mac service automatically after recording. The Python server has no authentication or TLS,
+so bind it only on a trusted local network.
+
+The model inference for arbitrary sentences and recording analysis currently
+runs on the Mac; this is a native iPhone app with a networked analysis service,
+not an on-device model port. The existing Claude/demo lesson feedback remains
+available separately.
+
 If you prefer not to use XcodeGen: create a new iOS App project named MouthCoach (SwiftUI, Swift), delete its generated
 `ContentView.swift` and `MouthCoachApp.swift`, drag the `MouthCoach/` folder in, and add the Info.plist keys listed in `project.yml`
 (camera and microphone usage descriptions, `MouthCoachFeedbackServerURL`, `NSAppTransportSecurity`).
@@ -50,16 +91,13 @@ to the MouthCoach server (`POST /api/feedback`), which calls Claude with the key
 
 Without a reachable server, the app offers demo feedback.
 
-## Verifying the shared core without a Mac
+## Verifying the app
 
-`Core/` uses only Foundation, so it builds anywhere Swift does. `CoreChecks/` holds checks for lesson decoding, the mouth geometry,
-the analysis and the feedback JSON:
-
-```bash
-cd ios
-swiftc -swift-version 5 MouthCoach/Core/*.swift CoreChecks/main.swift -o corechecks
-./corechecks MouthCoach/Resources/lessons.json
-```
+Run `xcodegen generate`, then build the `MouthCoach` scheme for an iPhone
+Simulator or a signed physical iPhone in Xcode. The bundled lessons should
+appear without the Mac service. On a real iPhone, allow camera and microphone
+access, then verify that the yellow outline follows the lips and that the blue
+outline can be selected independently.
 
 Lip measurements from Vision use outline extents, scaled to match the web app's face unit (`faceUnitPerContourWidth` in
 `Core/MouthFeatures.swift`). The thresholds were tuned for MediaPipe, so check the “What the camera measured” results on a real

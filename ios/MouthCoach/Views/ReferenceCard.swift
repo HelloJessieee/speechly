@@ -5,6 +5,8 @@ struct ReferenceCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stepModeChoice: Bool?
     @State private var stepIndex = 0
+    @State private var sentenceInput = ""
+    @State private var showSentenceSetup = false
 
     private var stepMode: Bool { stepModeChoice ?? reduceMotion }
 
@@ -20,20 +22,24 @@ struct ReferenceCard: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Eyebrow(text: "Reference")
-                    Text(lesson.text).font(.system(size: 36, weight: .heavy))
-                    Text("\(lesson.pronunciation.respelling) · \(lesson.pronunciation.ipa)")
-                        .foregroundStyle(Color.mcInkSoft)
+                    Text(model.referenceText.isEmpty ? "Record to create a full-sentence guide" : model.referenceText)
+                        .font(.system(size: model.customReference ? 26 : 36, weight: .heavy))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !model.customReference {
+                        Text("\(lesson.pronunciation.respelling) · \(lesson.pronunciation.ipa)")
+                            .foregroundStyle(Color.mcInkSoft)
+                    }
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
                     Button {
-                        model.speech.speak(lesson.text, slow: player.speed < 1)
+                        model.speech.speak(model.referenceText, slow: player.speed < 1)
                     } label: {
                         Label(model.speech.speaking ? "Speaking…" : "Hear it", systemImage: "speaker.wave.2")
                     }
                     .secondaryButton()
                     .disabled(!model.speech.available)
-                    .accessibilityLabel("Hear “\(lesson.text)” spoken by an on-device voice")
+                    .accessibilityLabel("Hear “\(model.referenceText)” spoken by an on-device voice")
                     if !model.speech.available {
                         Text("Audio preview is unavailable on this device.")
                             .font(.caption)
@@ -43,11 +49,34 @@ struct ReferenceCard: View {
                 }
             }
 
-            Picker("Animation mode", selection: Binding(get: { model.animationMode }, set: { model.setAnimationMode($0) })) {
-                Text("Reference").tag(AnimationMode.reference)
-                Text("Correction guidance").tag(AnimationMode.correction)
+            if model.customReference {
+                HStack(spacing: 6) {
+                    Text("Guide word:").font(.subheadline.bold())
+                    Text(model.currentReferenceWord ?? "pause")
+                        .font(.headline).foregroundStyle(Color.mcAmberInk)
+                    Spacer()
+                    Text("Looping guide").font(.caption).foregroundStyle(Color.mcInkSoft)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(model.referenceWords.enumerated()), id: \.offset) { _, word in
+                            Text(word).padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(word == model.currentReferenceWord ? Color.mcAmberSoft : .white.opacity(0.5), in: Capsule())
+                        }
+                    }
+                }
+            } else {
+                Text("Guide word: \(model.currentReferenceWord ?? "pause")")
+                    .font(.subheadline.bold()).foregroundStyle(Color.mcAmberInk)
             }
-            .pickerStyle(.segmented)
+
+            if !model.customReference {
+                Picker("Animation mode", selection: Binding(get: { model.animationMode }, set: { model.setAnimationMode($0) })) {
+                    Text("Reference").tag(AnimationMode.reference)
+                    Text("Correction guidance").tag(AnimationMode.correction)
+                }
+                .pickerStyle(.segmented)
+            }
 
             VStack(spacing: 0) {
                 MouthCanvas(
@@ -89,6 +118,27 @@ struct ReferenceCard: View {
             Toggle("Step-by-step view (no motion)", isOn: Binding(get: { stepMode }, set: { stepModeChoice = $0 }))
                 .font(.subheadline.weight(.semibold))
                 .tint(.mcSage)
+
+            DisclosureGroup("Use a different sentence", isExpanded: $showSentenceSetup) {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Enter an English sentence", text: $sentenceInput)
+                        .textFieldStyle(.roundedBorder)
+                        .textInputAutocapitalization(.sentences)
+                    HStack {
+                        Button("Create looping guide") {
+                            Task { await model.loadSentence(sentenceInput) }
+                        }
+                        .secondaryButton()
+                        .disabled(model.referenceLoading || sentenceInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                        if model.referenceLoading { ProgressView() }
+                    }
+                    Text("Uses the Mac speech service.")
+                        .font(.caption).foregroundStyle(Color.mcInkSoft)
+                    if let error = model.referenceError { Text(error).font(.footnote).foregroundStyle(Color.mcAmberInk) }
+                }
+                .padding(.top, 8)
+            }
+            .font(.subheadline.weight(.semibold))
         }
         .padding(18)
         .glassCard()

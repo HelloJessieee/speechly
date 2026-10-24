@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "speech-mirror-engine"
+version = "0.1.0"
+description = "Offline speech measurements and experimental phoneme analysis"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26,<3", "scipy>=1.11,<2", "pydantic>=2.7,<3"]
+
+[project.optional-dependencies]
+phonemes = ["torch>=2.3", "transformers>=4.45,<5", "huggingface-hub>=0.25", "protobuf>=4.25,<7"]
+asr = ["torch>=2.3", "transformers>=4.45,<5", "huggingface-hub>=0.25", "protobuf>=4.25,<7", "phonemizer>=3.2,<4"]
+gemma = ["litert-lm-api==0.18.1"]
+research = ["torch>=2.3", "transformers>=4.45,<5", "praatio>=6.2,<7", "remotezip>=0.12,<1"]
+
+[project.scripts]
+speech-mirror = "speech_mirror.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

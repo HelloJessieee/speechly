@@ -11,6 +11,7 @@ final class ReferencePlayer {
     /// True once the learner has watched a timeline to the end.
     private(set) var watched = false
     var speed: Double = 1
+    var loops = true
 
     @ObservationIgnored private var task: Task<Void, Never>?
 
@@ -37,9 +38,13 @@ final class ReferencePlayer {
                 self.time = min(self.duration, self.time + now.timeIntervalSince(last) * 1000 * self.speed)
                 last = now
                 if self.time >= self.duration {
-                    self.playing = false
                     self.watched = true
-                    return
+                    if self.loops, self.duration > 0 {
+                        self.time = 0
+                    } else {
+                        self.playing = false
+                        return
+                    }
                 }
             }
         }
