@@ -6,17 +6,17 @@
 
 Imagine rehearsing a sentence before speaking in class, asking for help, or joining a conversation. You say it aloud, and a speech recognizer returns different words. The speaker knows what they meant; the model only has a guess. For people with speech disabilities, being misunderstood can make ordinary moments harder to enter. A practice tool should not turn that uncertainty into a verdict about the person.
 
-Speech Mirror gives that choice back to the speaker. They record a sentence, review what the model heard, and confirm their own words. A word-by-word mouth guide can be viewed alongside their lip movement. Voice measurements and a locally generated Gemma suggestion then turn the attempt into one concrete action to try next.
+Speechly gives that choice back to the speaker. They record a sentence, review what the model heard, and confirm their own words. A word-by-word mouth guide can be viewed alongside their lip movement. Voice measurements and a locally generated Gemma suggestion then turn the attempt into one concrete action to try next.
 
-We are building for English learners and people with speech differences, including people with speech disabilities who may benefit from visual cues and a private place to rehearse. The social goal is simple: give more people tools to participate in everyday communication on their own terms. Speech Mirror supports practice; it does not replace a speech-language professional or claim a clinical benefit that has not been demonstrated.
+We are building for English learners and people with speech differences, including people with speech disabilities who may benefit from visual cues and a private place to rehearse. The social goal is simple: give more people tools to participate in everyday communication on their own terms. Speechly supports practice; it does not replace a speech-language professional or claim a clinical benefit that has not been demonstrated.
 
 **Speak → See → Improve.** Record and confirm your words; follow a visual guide; review the evidence, practice one action, and try again.
 
-The repository includes native iOS and Google Pixel apps, a browser-based lesson experience, and a Mac companion for local Whisper recognition, speech measurements, experimental phoneme comparison, and Gemma 4 E2B coaching through LiteRT-LM. The visual guide and model outputs are practice aids. Speech Mirror does not diagnose, treat, or score a medical condition, and the prototype has not established clinical or pronunciation outcomes.
+The repository includes native iOS and Google Pixel apps, a browser-based lesson experience, and a Mac companion for local Whisper recognition, speech measurements, experimental phoneme comparison, and Gemma 4 E2B coaching through LiteRT-LM. The visual guide and model outputs are practice aids. Speechly does not diagnose, treat, or score a medical condition, and the prototype has not established clinical or pronunciation outcomes.
 
-<img src="docs/assets/team.jpg" alt="The Speech Mirror team together outdoors" width="720">
+<img src="docs/assets/team.jpg" alt="The Speechly team together outdoors" width="720">
 
-*The team behind Speech Mirror.*
+*The team behind Speechly.*
 
 <img src="articulation-studio/dist/assets/reference.png" alt="Character concept sheet with head angles and illustrative mouth shapes" width="720">
 
@@ -106,7 +106,7 @@ This browser lesson app needs no API keys, backend or network services. Fonts an
 
 ## Claude feedback
 
-When the camera is on, MouthCoach measures the lips while you record and can ask Claude for feedback on that attempt.
+When the camera is on, Speechly measures the lips while you record and can ask Claude for feedback on that attempt.
 
 1. **Lip tracking (in the browser).** MediaPipe Face Landmarker (478-point face mesh) runs locally on each camera frame. The
    model and WebAssembly runtime are bundled in `public/mediapipe/`, so no CDN is needed.

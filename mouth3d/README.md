@@ -1,4 +1,4 @@
-# 3D mouth lab
+# Speechly 3D mouth lab
 
 A standalone web page for building and checking the 3D mouth model. It does
 not import anything from the original app, so it keeps working while that app

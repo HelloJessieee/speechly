@@ -1,6 +1,6 @@
-# Speech Mirror Mac service
+# Speechly Mac service
 
-This Python package supplies the native iPhone app with sentence mouth guides,
+This Python package supplies the native iOS and Pixel apps with sentence mouth guides,
 English Whisper transcription, audio measurements, experimental phoneme
 comparison, and optional local Gemma suggestions. The model files are downloaded
 separately and are excluded from Git.

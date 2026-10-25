@@ -1,7 +1,8 @@
 # Speechly for iOS
 
-A native SwiftUI version of MouthCoach for iPhone and iPad (iOS 17+). It follows the web app's design: the same lessons,
+A native SwiftUI version of Speechly for iPhone and iPad (iOS 17+). It follows the web app's design: the same lessons,
 mouth animation, practice flow, landmark measurements and feedback, with Liquid Glass styling on iOS 26.
+The Xcode project, scheme, and source folder still use the technical name `MouthCoach`.
 
 ## Open in Xcode
 
@@ -17,7 +18,7 @@ open MouthCoach.xcodeproj
 In Xcode, select the **MouthCoach** target → **Signing & Capabilities**, choose your team, then run on a simulator or a device.
 The camera, microphone and lip tracking need a real device; the Simulator has no camera, but demo mode works there.
 
-## Speech Mirror integration
+## Speechly integration
 
 The native iPhone app has three horizontally swipeable pages: **Start** for
 typing or recording to get a transcript guess; **Mouth Guide** for the looping
@@ -42,7 +43,7 @@ cd mac_service
 .venv/bin/python -m speech_mirror.web --host 0.0.0.0 --port 8765
 ```
 
-This test build defaults to `http://192.168.0.160:8765` for Speech Mirror requests.
+This test build defaults to `http://192.168.0.160:8765` for Speechly requests.
 Open the gear icon in the app and save your Mac's current LAN address with port
 8765 if it differs. Both devices must be
 on the same trusted network. On Start, type an English phrase directly or record
@@ -96,7 +97,7 @@ refresh `ios/MouthCoach/Resources/lessons.json`.
 ## Claude feedback
 
 The app never contains the Claude API key. Like the web app, it sends the lip measurements and up to four mouth-only snapshots
-to the MouthCoach server (`POST /api/feedback`), which calls Claude with the key from `.env`.
+to the Speechly feedback server (`POST /api/feedback`), which calls Claude with the key from `.env`.
 
 - **Simulator:** the default `MouthCoachFeedbackServerURL` is `http://localhost:5173`, which reaches `npm run dev` on the same Mac.
 - **iPhone on the same Wi-Fi:** run the server on your Mac with `npm run dev -- --host 0.0.0.0`, then set
