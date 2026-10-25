@@ -3,39 +3,49 @@ import SwiftUI
 
 struct RecognitionCard: View {
     @Environment(AppModel.self) private var model
+    @State private var typedSentence = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Eyebrow(text: "Transcript")
-            if model.awaitingIntentConfirmation {
-                Text("Whisper heard").font(.caption.bold()).foregroundStyle(Color.mcInkSoft)
+            Eyebrow(text: "Your words")
+            if model.customReference {
+                Text(model.referenceText).font(.title3.bold())
+                Text("Your mouth guide is ready.").font(.subheadline).foregroundStyle(Color.mcInkSoft)
+                Button("Start a new sentence") { model.startFreeSpeech() }.secondaryButton()
+            } else {
+                TextField("Type what you want to say", text: $typedSentence)
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.sentences)
+                    .submitLabel(.done)
+                Button("Create mouth guide", systemImage: "mouth") {
+                    Task { await model.createGuide(from: typedSentence) }
+                }
+                .primaryButton()
+                .disabled(model.referenceLoading || typedSentence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if model.referenceLoading { ProgressView("Creating guide…") }
+                if let error = model.referenceError { Text(error).font(.subheadline).foregroundStyle(Color.mcAmberInk) }
+                Text("Or record below for a text guess.").font(.subheadline).foregroundStyle(Color.mcInkSoft)
+            }
+            if model.awaitingIntentConfirmation && !model.customReference {
+                Text("Heard, approximately").font(.caption.bold()).foregroundStyle(Color.mcInkSoft)
                 Text(model.mirrorResult?.asr?.text ?? "No clear words detected")
                     .font(.title3.bold())
-                Text("Whisper can be wrong. Edit the text to match what you intended to say.")
-                    .font(.subheadline).foregroundStyle(Color.mcInkSoft)
                 TextField("What you meant to say", text: Binding(get: { model.recognizedDraft }, set: { model.recognizedDraft = $0 }))
                     .textFieldStyle(.roundedBorder)
                     .textInputAutocapitalization(.sentences)
-                Button("Confirm sentence", systemImage: "checkmark") {
+                Button("Use these words", systemImage: "checkmark") {
                     Task { await model.confirmRecognizedText(model.recognizedDraft) }
                 }
                 .primaryButton()
                 .disabled(model.mirrorLoading || model.recognizedDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            } else if !model.referenceText.isEmpty {
-                Text("Confirmed sentence").font(.caption.bold()).foregroundStyle(Color.mcInkSoft)
-                Text(model.referenceText).font(.title3.bold())
-                Text("Swipe to Mouth Guide for the looping reference.")
-                    .font(.subheadline).foregroundStyle(Color.mcInkSoft)
-            } else {
-                Text("Record a sentence. Whisper will propose a transcript automatically.")
-                    .font(.subheadline).foregroundStyle(Color.mcInkSoft)
             }
 
             if model.mirrorLoading {
-                ProgressView(model.awaitingIntentConfirmation
-                             ? "Comparing your sentence…"
-                             : "Recognizing speech… The first model load can take about a minute.")
+                ProgressView("Finding words…")
                     .font(.subheadline)
+            }
+            if model.fullAnalysisRunning && !model.mirrorLoading, let stage = model.analysisStage {
+                ProgressView(stage).font(.subheadline)
             }
             if let error = model.mirrorError {
                 Text(error).font(.subheadline).foregroundStyle(Color.mcAmberInk)
@@ -50,8 +60,6 @@ struct RecognitionCard: View {
                 .secondaryButton()
             }
 
-            Text("Mac analysis service: \(SpeechMirrorService.baseURL.absoluteString)")
-                .font(.caption).foregroundStyle(Color.mcInkSoft)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,9 +73,40 @@ struct AnalysisResultCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Eyebrow(text: "Speech analysis")
-            if model.awaitingIntentConfirmation {
-                Text("Confirm your transcript on Practice to see the comparison.")
+            if model.mirrorLoading && !model.fullAnalysisRunning {
+                ProgressView("Recognizing speech on your Mac…")
+                    .font(.subheadline)
+            }
+            if model.fullAnalysisRunning, let stage = model.analysisStage {
+                ProgressView(stage).font(.subheadline)
+            }
+            if let error = model.mirrorError {
+                Text(error).font(.subheadline).foregroundStyle(Color.mcAmberInk)
+            }
+            if model.mirrorError == nil, let error = model.referenceError {
+                Text(error).font(.subheadline).foregroundStyle(Color.mcAmberInk)
+                if model.guideRecordingConfirmed && !model.referenceLoading {
+                    Button("Retry mouth guide") { Task { await model.retryReference() } }
+                        .secondaryButton()
+                }
+            }
+            if !model.guideRecordingConfirmed {
+                Text(model.customReference
+                     ? "Record and confirm a take on Mouth Guide, or confirm your recorded sentence on Start."
+                     : "Create a mouth guide on Start.")
                     .font(.subheadline).foregroundStyle(Color.mcInkSoft)
+            } else if model.awaitingIntentConfirmation {
+                Text("Whisper heard: \(model.mirrorResult?.asr?.text ?? "No clear words")")
+                    .font(.subheadline.weight(.semibold))
+                TextField("What you meant to say", text: Binding(get: { model.recognizedDraft },
+                                                                  set: { model.recognizedDraft = $0 }))
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.sentences)
+                Button("Confirm sentence", systemImage: "checkmark") {
+                    Task { await model.confirmRecognizedText(model.recognizedDraft) }
+                }
+                .primaryButton()
+                .disabled(model.recognizedDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             } else if let result = model.mirrorResult {
                 section("Words") {
                     Text("Whisper heard: \(result.asr?.text ?? "No clear words")")
@@ -75,8 +114,13 @@ struct AnalysisResultCard: View {
                     if let comparison = result.intent?.comparison {
                         Text(english(comparison, fallback: "Whisper's guess may differ from your confirmed words."))
                     }
-                    Text("Whisper is a tentative guess, not a pronunciation score.")
-                        .font(.caption).foregroundStyle(Color.mcInkSoft)
+                }
+                if !ArticulationCoachView.cues(for: result.phoneme_assessment,
+                                               referenceWords: model.referenceWordDetails).isEmpty {
+                    section("3D articulation practice") {
+                        ArticulationCoachView(assessment: result.phoneme_assessment,
+                                              referenceWords: model.referenceWordDetails)
+                    }
                 }
                 section("Voice measurements") {
                     Text(String(format: "Recording %.1f s · Voiced %.1f s", result.measurements.duration_s, result.measurements.voiced_duration_s))
@@ -86,6 +130,14 @@ struct AnalysisResultCard: View {
                     }
                     Text(result.audio_quality.usable ? "Signal usable for comparison" : "Signal too weak for a reliable comparison")
                         .foregroundStyle(result.audio_quality.usable ? Color.mcSage : Color.mcAmberInk)
+                }
+                if let visual = model.visualFeatures {
+                    section("Mouth tracking") {
+                        Text("Lips tracked in \(Int(visual.tracked_fraction * 100))% of sampled camera frames")
+                        if let aperture = visual.median_aperture_ratio {
+                            Text(String(format: "Median opening / mouth width: %.2f", aperture))
+                        }
+                    }
                 }
                 if !result.visual_data.pitch_trace.isEmpty {
                     section("Pitch trace") {
@@ -108,7 +160,13 @@ struct AnalysisResultCard: View {
                     }
                 }
                 section("Phoneme model") {
-                    Text(result.phoneme_assessment.status == "tentative" ? "Tentative phoneme guess" : "Phoneme comparison has not run or was unavailable")
+                    Text(result.phoneme_assessment.status == "tentative" ? "Tentative phoneme guess" :
+                         result.phoneme_assessment.status == "not_run" && model.phonemeLoading ? "Phoneme comparison is running…" :
+                         result.phoneme_assessment.status == "not_run" ? "Phoneme comparison has not run yet" :
+                         "Phoneme comparison is unavailable")
+                    if let source = result.phoneme_assessment.model {
+                        Text(source).font(.caption).foregroundStyle(Color.mcInkSoft)
+                    }
                     if !result.phoneme_assessment.target.isEmpty {
                         Text("Target: /\(result.phoneme_assessment.target.joined(separator: " "))/")
                     }
@@ -118,10 +176,12 @@ struct AnalysisResultCard: View {
                     ForEach(Array(result.phoneme_assessment.possible_substitutions.enumerated()), id: \.offset) { item in
                         Text("Possible \(item.element.type): \(item.element.expected ?? "—") → \(item.element.observed ?? "—")")
                     }
-                    Text("Differences may reflect model error or accent; they are not a score.")
-                        .font(.caption).foregroundStyle(Color.mcInkSoft)
+                    if let reason = result.phoneme_assessment.reason {
+                        Text(english(reason, fallback: "The experimental phoneme model could not provide a reliable comparison."))
+                            .font(.caption).foregroundStyle(Color.mcInkSoft)
+                    }
                 }
-                if !result.phoneme_assessment.target.isEmpty && result.phoneme_assessment.status == "not_run" {
+                if !model.fullAnalysisRunning && !result.phoneme_assessment.target.isEmpty && result.phoneme_assessment.status == "not_run" {
                     Button("Run experimental phoneme model", systemImage: "waveform") {
                         Task { await model.analyzePhonemes() }
                     }
@@ -130,15 +190,19 @@ struct AnalysisResultCard: View {
                 }
                 if model.phonemeLoading { ProgressView("The first phoneme model load may take a minute…") }
                 if let error = model.phonemeError { Text(error).font(.subheadline).foregroundStyle(Color.mcAmberInk) }
-                section(result.coach.source == "gemma_local" ? "Gemma suggestion" : "Practice suggestion") {
+                section(result.coach.source == "gemma_local" ? "How to improve · Gemma" : "How to improve") {
                     Text(english(result.coach.feedback,
                                  fallback: "Replay the recording, say one word separately, then return to the full sentence."))
                         .font(.body.weight(.semibold))
                     Text(english(result.coach.next_exercise,
                                  fallback: "Record the same sentence once more and compare."))
                         .font(.subheadline).foregroundStyle(Color.mcInkSoft)
+                    if let reason = result.coach.reason {
+                        Text(english(reason, fallback: "Gemma could not give a usable suggestion, so a measured fallback is shown."))
+                            .font(.caption).foregroundStyle(Color.mcInkSoft)
+                    }
                 }
-                if model.recorder.recording?.url != nil && !model.gemmaLoading {
+                if model.confirmedRecordingURL != nil && !model.gemmaLoading && !model.fullAnalysisRunning {
                     Button("Ask Gemma for a suggestion", systemImage: "sparkles") {
                         Task { await model.generateGemma() }
                     }
@@ -153,8 +217,18 @@ struct AnalysisResultCard: View {
                         .font(.caption).foregroundStyle(Color.mcInkSoft)
                 }
             } else {
-                Text("Record and confirm a sentence on Practice. Your results will appear here.")
+                Text(model.mirrorLoading || model.fullAnalysisRunning
+                     ? "Your recording is saved. Results will appear here as each stage finishes."
+                     : "Record and confirm a sentence on Practice. Your results will appear here.")
                     .font(.subheadline).foregroundStyle(Color.mcInkSoft)
+            }
+            if !model.fullAnalysisRunning && model.guideRecordingConfirmed &&
+               model.confirmedRecordingURL != nil && !model.referenceText.isEmpty &&
+               (model.mirrorResult?.intent?.confirmed_text == nil || model.mirrorError != nil) {
+                Button("Retry full analysis", systemImage: "arrow.clockwise") {
+                    Task { await model.analyzeConfirmedRecording() }
+                }
+                .secondaryButton()
             }
         }
         .padding(18)

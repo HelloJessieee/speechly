@@ -80,18 +80,22 @@ def analyze(wav_bytes: bytes, exercise_id: str = "vowel_u_sustain", target_durat
             asr, asr_ms = transcribe(audio.samples)
         else:
             asr = {"status": "unavailable", "text": None, "model": None, "reason": "录音信号不足，无法判断听到的词句。"}
-    phoneme_assessment = {"status": "not_run", "target": target["phonemes"], "predicted": None, "possible_substitutions": [], "confidence": None}
+    phoneme_assessment = {"status": "not_run", "target": target["phonemes"], "predicted": None, "possible_substitutions": [], "confidence": None, "model": None}
     phoneme_ms = None
-    single_word_target = []
+    phrase_target = []
     if exercise_id == "free_speech" and intended_text:
-        from .g2p import phonemes_for_single_word
-        single_word_target = phonemes_for_single_word(intended_text)
-        if single_word_target:
-            phoneme_assessment["target"] = single_word_target
-    if (phonemes or single_word_target) and not skip_phonemes:
-        if quality["usable"] and measurements["voiced_duration_s"] >= 0.15:
+        from .g2p import phonemes_for_short_phrase
+        phrase_target = phonemes_for_short_phrase(intended_text)
+        if phrase_target:
+            phoneme_assessment["target"] = phrase_target
+    automatic_single_word = bool(phrase_target) and intended_text is not None and len(intended_text.split()) == 1
+    if (phonemes or automatic_single_word) and not skip_phonemes:
+        if exercise_id == "free_speech" and not phrase_target:
+            phoneme_assessment["status"] = "unavailable"
+            phoneme_assessment["reason"] = "Experimental phoneme comparison supports up to ten English words and 30 target phonemes."
+        elif quality["usable"] and measurements["voiced_duration_s"] >= 0.15:
             from .phonemes import recognize
-            phoneme_assessment, phoneme_ms = recognize(audio.samples, single_word_target or target["phonemes"])
+            phoneme_assessment, phoneme_ms = recognize(audio.samples, phrase_target or target["phonemes"])
         else:
             phoneme_assessment["status"] = "unavailable"
             phoneme_assessment["reason"] = "录音质量不足，未运行音素模型。"
@@ -145,7 +149,9 @@ def analyze(wav_bytes: bytes, exercise_id: str = "vowel_u_sustain", target_durat
             "exercise": target["label"], "target_phonemes": phoneme_assessment["target"],
             "target_duration_s": target_duration_s, "measurements": measurements,
             "audio_quality_warnings": quality["warnings"],
-            "phoneme_assessment": {"status": phoneme_assessment["status"], "predicted": phoneme_assessment["predicted"]},
+            "phoneme_assessment": {"status": phoneme_assessment["status"], "target": phoneme_assessment["target"],
+                                   "predicted": phoneme_assessment["predicted"],
+                                   "possible_substitutions": phoneme_assessment["possible_substitutions"][:4]},
             "observations": observations,
             "visual_features": visual.model_dump() if visual is not None else None,
             "asr_hypothesis": asr["text"] if exercise_id == "free_speech" else None,
@@ -156,12 +162,13 @@ def analyze(wav_bytes: bytes, exercise_id: str = "vowel_u_sustain", target_durat
             kwargs = {"language": "en"} if language == "en" else {}
             model_coach, gemma_ms = generate(evidence, allow_lips=visual is not None and visual.tracked_frames >= 3 and (visual.tracked_fraction or 0) >= .6, **kwargs)
             candidate = model_coach.model_dump(exclude_none=True)
-            mentioned_phones = [phone for phone in phoneme_assessment["target"] if (len(phone) > 1 or not phone.isascii()) and phone in candidate["feedback"]]
+            mentioned_phones = re.findall(r"/([^/\s]{1,8})/", candidate["feedback"] + " " + candidate["next_exercise"])
             supported_phones = {item["expected"] for item in phoneme_assessment["possible_substitutions"]}
-            action_pattern = r"replay|repeat|say|compare|slow|listen|word|sentence" if language == "en" else r"放慢|慢速|单独|分开|连回|比较|两次"
-            if exercise_id == "free_speech" and not re.search(action_pattern, candidate["feedback"], re.IGNORECASE):
+            practice_text = candidate["feedback"] + " " + candidate["next_exercise"]
+            action_pattern = r"replay|repeat|say|compare|slow|listen|practice|try" if language == "en" else r"回听|重说|练习|放慢|慢速|单独|分开|连回|比较"
+            if exercise_id == "free_speech" and not re.search(action_pattern, practice_text, re.IGNORECASE):
                 coach["reason"] = "Gemma did not give a concrete practice step, so a rule-based suggestion is shown." if language == "en" else "Gemma 建议缺少具体练习动作，改用依据模型假设和确认原意生成的步骤。"
-            elif exercise_id.startswith("word_") and (target["text"].lower() not in candidate["feedback"].lower() or not re.search(r"回听|对照|放慢|慢速|单独|重说|比较", candidate["feedback"])):
+            elif exercise_id.startswith("word_") and (target["text"].lower() not in practice_text.lower() or not re.search(r"回听|对照|放慢|慢速|单独|重说|比较|练习", practice_text)):
                 coach["reason"] = "Gemma 没有点名目标词和具体动作，改用音素对照的练习步骤。"
             elif any(phone not in supported_phones for phone in mentioned_phones):
                 coach["reason"] = "Gemma focused on a phoneme without evidence of a difference, so a replay step is shown." if language == "en" else "Gemma 聚焦的音素没有差异证据，改用回听与重说步骤。"

@@ -14,6 +14,7 @@ MODEL = Path(__file__).parents[2] / "models" / "gemma" / "gemma-4-E2B-it.litertl
 _LOCK = threading.Lock()
 _ENGINE = None
 _ENGINE_PATH: Path | None = None
+_ENGINE_BACKEND: str | None = None
 ALLOWED_VISUALIZATIONS = {"duration_comparison", "pitch_trace", "volume_trace", "lip_shape_comparison", "none"}
 UNSUPPORTED_CLAIMS = re.compile(r"(?:准确率|正确率|诊断|疾病|康复率|舌|牙|喉|声带|声门|tongue|teeth|throat|accuracy|diagnos)|\d+\s*%", re.IGNORECASE)
 
@@ -28,16 +29,21 @@ def model_available() -> bool:
 
 
 def _get_engine():
-    global _ENGINE, _ENGINE_PATH
+    global _ENGINE, _ENGINE_PATH, _ENGINE_BACKEND
     path = model_path()
+    backend_name = os.environ.get("SPEECH_MIRROR_GEMMA_BACKEND", "gpu").lower()
+    if backend_name not in {"gpu", "cpu"}:
+        raise ValueError("SPEECH_MIRROR_GEMMA_BACKEND must be gpu or cpu")
     if not model_available():
         raise FileNotFoundError(f"本地 Gemma 模型不存在：{path}")
-    if _ENGINE is None or _ENGINE_PATH != path:
+    if _ENGINE is None or _ENGINE_PATH != path or _ENGINE_BACKEND != backend_name:
         import litert_lm
         if _ENGINE is not None:
             _ENGINE.close()
-        _ENGINE = litert_lm.Engine(str(path), backend=litert_lm.Backend.CPU(), max_num_tokens=2048)
+        backend = litert_lm.Backend.GPU() if backend_name == "gpu" else litert_lm.Backend.CPU()
+        _ENGINE = litert_lm.Engine(str(path), backend=backend, max_num_tokens=1024)
         _ENGINE_PATH = path
+        _ENGINE_BACKEND = backend_name
     return _ENGINE
 
 
@@ -45,6 +51,16 @@ def _prompt(evidence: dict, *, language: str = "zh") -> str:
     measurements = evidence.get("measurements") or {}
     phones = evidence.get("phoneme_assessment") or {}
     visual = evidence.get("visual_features") or {}
+    observations = evidence.get("observations") or []
+    if language == "en":
+        observations = [item for item in observations if isinstance(item, str) and not re.search(r"[\u3400-\u9fff]", item)]
+    phone_summary = None
+    if phones.get("status") == "tentative":
+        phone_summary = {
+            "target": (phones.get("target") or [])[:16],
+            "heard_guess": (phones.get("predicted") or [])[:16],
+            "possible_differences": (phones.get("possible_substitutions") or [])[:4],
+        }
     compact = {
         "target": evidence.get("user_confirmed_intent") or evidence.get("exercise"),
         "heard_guess": evidence.get("asr_hypothesis"),
@@ -54,21 +70,26 @@ def _prompt(evidence: dict, *, language: str = "zh") -> str:
         "level_dbfs": measurements.get("rms_dbfs"),
         "pitch_hz": measurements.get("median_f0_hz"),
         "warnings": (evidence.get("audio_quality_warnings") or [])[:2],
-        "phones": phones if phones.get("status") == "tentative" else None,
+        "observations": observations[:2],
+        "phones": phone_summary,
         "lip_tracking": visual.get("tracked_fraction") if visual.get("tracked_frames", 0) >= 3 else None,
+        "lip_aperture_ratio": visual.get("median_aperture_ratio") if visual.get("tracked_frames", 0) >= 3 else None,
     }
     data = json.dumps(compact, ensure_ascii=False, separators=(",", ":"))
     if language == "en":
         return (
             "Use only this evidence. ASR and phonemes are guesses, not proof. Give one concrete English practice step "
             "naming a word in target: replay, say it alone, then in the sentence. No diagnosis, accuracy score, "
-            "or claims about unmeasured tongue, teeth or throat. Return only JSON with feedback (under 120 characters), "
-            "next_exercise, and visualization (none, volume_trace, pitch_trace, duration_comparison, or lip_shape_comparison). "
+            "or claims about unmeasured tongue, teeth or throat. Do not name a specific IPA sound unless "
+            "phones.possible_differences includes it as an expected sound. Return one compact JSON object with feedback "
+            "(under 70 characters), next_exercise (under 50 characters), and visualization "
+            "(none, volume_trace, pitch_trace, duration_comparison, or lip_shape_comparison). "
             "Use lip_shape_comparison only with good lip tracking. Evidence: " + data
         )
     return (
         "只根据证据给一个简短中文练习动作，点名目标词：回听、单独慢说、再放回整句。"
         "ASR和音素只是猜测；不得声称准确率、诊断、舌牙喉或未测到的变化。"
+        "除非possible_differences有目标音素，不要点名某个音素。"
         "只返回JSON，字段feedback（不超过70字）、next_exercise、visualization。"
         "visualization选none、volume_trace、pitch_trace、duration_comparison或lip_shape_comparison；"
         "口型跟踪不足时不要选最后一项。证据：" + data
@@ -99,9 +120,23 @@ def generate(evidence: dict, *, allow_lips: bool, language: str = "zh") -> tuple
     started = perf_counter()
     with _LOCK:
         engine = _get_engine()
-        with engine.create_conversation(max_output_tokens=160) as conversation:
+        import litert_lm
+        with engine.create_conversation(max_output_tokens=96,
+                                        thinking_config=litert_lm.ThinkingConfig(enable_thinking=False)) as conversation:
             response = conversation.send_message(_prompt(evidence, language=language))
         coach = _parse_response(str(response), allow_lips=allow_lips)
         if language == "en" and re.search(r"[\u3400-\u9fff]", coach.feedback + coach.next_exercise):
             raise ValueError("Gemma response was not in English")
     return coach, round((perf_counter() - started) * 1000, 1)
+
+
+def warmup() -> float:
+    """Load Gemma and run one tiny generation before the first user request."""
+    started = perf_counter()
+    with _LOCK:
+        engine = _get_engine()
+        import litert_lm
+        with engine.create_conversation(max_output_tokens=4,
+                                        thinking_config=litert_lm.ThinkingConfig(enable_thinking=False)) as conversation:
+            conversation.send_message("Reply OK.")
+    return round((perf_counter() - started) * 1000, 1)

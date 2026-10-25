@@ -1,4 +1,4 @@
-# MouthCoach for iOS
+# Speechly for iOS
 
 A native SwiftUI version of MouthCoach for iPhone and iPad (iOS 17+). It follows the web app's design: the same lessons,
 mouth animation, practice flow, landmark measurements and feedback, with Liquid Glass styling on iOS 26.
@@ -19,18 +19,19 @@ The camera, microphone and lip tracking need a real device; the Simulator has no
 
 ## Speech Mirror integration
 
-The native iPhone app has three horizontally swipeable pages: **Practice** for
-camera, recording, and transcript confirmation; **Mouth Guide** for the looping
-sentence reference and live lip overlay; and **Results** for voice measurements,
-tentative phoneme comparison, and Gemma suggestions. The pages also have a
+The native iPhone app has three horizontally swipeable pages: **Start** for
+typing or recording to get a transcript guess; **Mouth Guide** for the looping
+sentence reference, live lip overlay, and a separate practice recording; and **Results** for voice measurements,
+tentative phoneme comparison, an offline Articulation Studio 3D target pose,
+and Gemma suggestions. The pages also have a
 bottom navigation bar. All app-facing labels and analysis messages are English.
 
 The app uses the sentence reference and audio analysis in `mac_service/`
 without replacing this app's SwiftUI camera, recorder, or seven mouth shapes.
-Select **Yellow**, **Blue**, or **Both** on Mouth Guide.
-Yellow is a looping reference contour attached to the detected lip center and
-scaled to lip width; blue traces the measured lips. The current reference word
-is shown beside both views. These visual shapes and timing are illustrative.
+Mouth Guide shows only the yellow looping reference contour, attached to the
+detected lip center and scaled to lip width. Start can also show the blue
+measured outline. The current reference word is shown beside the guide. These
+visual shapes and timing are illustrative.
 
 Preset lessons and live lip tracking run on the iPhone. For an arbitrary English
 sentence or Whisper / phoneme / Gemma analysis, set up and start the included
@@ -41,15 +42,28 @@ cd mac_service
 .venv/bin/python -m speech_mirror.web --host 0.0.0.0 --port 8765
 ```
 
-This test build defaults to `http://172.20.10.13:8765` for Speech Mirror requests.
+This test build defaults to `http://192.168.0.160:8765` for Speech Mirror requests.
 Open the gear icon in the app and save your Mac's current LAN address with port
 8765 if it differs. Both devices must be
-on the same trusted network. The app opens in free speech mode: record an
-English phrase, wait for automatic Whisper recognition, correct the proposed
-text if needed, then tap **Confirm sentence**. This generates the looping
-reference and returns basic voice measurements. On Results, run the experimental
-phoneme model for a single word or tap **Ask Gemma for a suggestion** separately.
-Those models may take longer to load. Audio is sent to the
+on the same trusted network. On Start, type an English phrase directly or record
+an initial clip, correct Whisper's proposed words, then tap **Use these words**.
+This generates the looping reference and immediately analyzes the confirmed
+initial clip. If you typed the phrase instead, record on Mouth Guide, listen
+or record again, then tap **Use this take** to start voice
+measurements, an experimental phoneme comparison for phrases of up to ten words
+and 30 target phonemes, and a Gemma practice suggestion.
+Return to Mouth Guide and repeat with another take whenever you want.
+Results appear in stages while the larger models load. The phoneme stage uses
+the local L2-ARCTIC fine-tuned candidate when its checkpoint is present; its
+held-out test report is still pending, so its differences remain tentative.
+The 3D target animation uses the bundled Articulation Studio rig. In Results,
+drag the model to rotate it, select a word to replay its supported mouth and
+tongue movements, or select a sound to inspect one pose. It is an illustration, not a
+measurement of the learner's tongue or teeth. Gemma runs on the Mac GPU with
+thinking disabled and starts warming when the Mac service starts.
+The yellow guide matches the detected mouth width at rest, has a size control,
+defaults to slow playback, and gives a light haptic pulse when the reference
+mouth step changes. Audio is sent to the
 configured Mac service automatically after recording. The Python server has no authentication or TLS,
 so bind it only on a trusted local network.
 

@@ -28,10 +28,21 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if model.mirrorLoading || model.fullAnalysisRunning {
+                HStack(spacing: 9) {
+                    ProgressView()
+                    Text(model.analysisStage ?? "Recognizing speech on your Mac…")
+                        .font(.caption.weight(.semibold))
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 9)
+                .background(Color.mcSageSoft)
+            }
             TabView(selection: $page) {
-                screen(title: "Practice", subtitle: "Speak freely, then confirm what you meant to say.") {
-                    PracticeCard()
+                screen(title: "Start", subtitle: "Record a guess or type the sentence.") {
                     RecognitionCard()
+                    if !model.customReference { PracticeCard() }
                 }
                 .tag(AppPage.practice)
 
@@ -42,16 +53,22 @@ struct ContentView: View {
                         if !model.customReference { LessonGuideCard() }
                     } else {
                         emptyState(symbol: "mouth", title: "Your guide will appear here",
-                                   detail: "Record a sentence on Practice, then confirm the words Whisper heard.") {
+                                   detail: "Record or type a sentence on Start.") {
                             page = .practice
                         }
                     }
                 }
                 .tag(AppPage.guide)
 
-                screen(title: "Results", subtitle: "Review the model's guesses and your next practice step.") {
+                screen(title: "Results", subtitle: "Your confirmed practice take.") {
                     AnalysisResultCard()
-                    if let analysis = model.currentAttempt?.analysis {
+                    if model.customReference {
+                        Button("Practice again", systemImage: "arrow.counterclockwise") {
+                            withAnimation { page = .guide }
+                        }
+                        .primaryButton()
+                    }
+                    if !model.freeSpeechMode, let analysis = model.currentAttempt?.analysis {
                         MeasurementsView(analysis: analysis)
                     }
                     if !model.freeSpeechMode { FeedbackCard() }
@@ -66,18 +83,30 @@ struct ContentView: View {
         .onChange(of: model.customReference) { _, ready in
             if ready { withAnimation { page = .guide } }
         }
+        .onChange(of: model.guideRecordingConfirmed) { _, confirmed in
+            if confirmed { withAnimation { page = .results } }
+        }
+        .onChange(of: model.fullAnalysisRunning) { _, running in
+            if !running && model.guideRecordingConfirmed && model.mirrorResult != nil {
+                withAnimation { page = .results }
+            }
+        }
+        .onChange(of: page) { _, selected in
+            model.player.hapticsEnabled = selected == .guide
+        }
+        .onAppear { model.player.hapticsEnabled = page == .guide }
         .sheet(isPresented: $showConnectionSettings) { MacConnectionSettings() }
     }
 
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: "mouth.fill")
-                .font(.title3)
-                .foregroundStyle(.white)
+            Image("AppIconImage")
+                .resizable()
+                .scaledToFill()
                 .frame(width: 40, height: 40)
-                .background(Color.mcSage, in: RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .accessibilityHidden(true)
-            Text("Speech Mirror").font(.headline.bold())
+            Text("Speechly").font(.headline.bold())
             Spacer()
             Menu {
                 Button("Free speech", systemImage: "waveform") {
@@ -121,9 +150,6 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 content()
-                Text("Reference mouth shapes and model predictions are practice aids, not proof of correct pronunciation.")
-                    .font(.caption).foregroundStyle(Color.mcInkSoft)
-                    .padding(.bottom, 10)
             }
             .padding(16)
             .frame(maxWidth: 700)
@@ -137,7 +163,7 @@ struct ContentView: View {
             Image(systemName: symbol).font(.system(size: 42)).foregroundStyle(Color.mcSage)
             Text(title).font(.title3.bold())
             Text(detail).font(.subheadline).multilineTextAlignment(.center).foregroundStyle(Color.mcInkSoft)
-            Button("Go to Practice", action: action).primaryButton()
+            Button("Go to Start", action: action).primaryButton()
         }
         .frame(maxWidth: .infinity)
         .padding(28)

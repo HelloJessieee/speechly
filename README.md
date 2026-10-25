@@ -12,7 +12,7 @@ We are building for English learners and people with speech differences, includi
 
 **Speak → See → Improve.** Record and confirm your words; follow a visual guide; review the evidence, practice one action, and try again.
 
-The current published prototype includes a native iPhone app, a browser-based lesson experience, and a Mac companion for local Whisper recognition, speech measurements, experimental phoneme comparison, and Gemma 4 E2B coaching through LiteRT-LM. The visual guide and model outputs are practice aids. Speech Mirror does not diagnose, treat, or score a medical condition, and the prototype has not established clinical or pronunciation outcomes.
+The repository includes native iOS and Google Pixel apps, a browser-based lesson experience, and a Mac companion for local Whisper recognition, speech measurements, experimental phoneme comparison, and Gemma 4 E2B coaching through LiteRT-LM. The visual guide and model outputs are practice aids. Speech Mirror does not diagnose, treat, or score a medical condition, and the prototype has not established clinical or pronunciation outcomes.
 
 <img src="docs/assets/team.jpg" alt="The Speech Mirror team together outdoors" width="720">
 
@@ -28,7 +28,34 @@ The current published prototype includes a native iPhone app, a browser-based le
 2. **See the movement.** The confirmed sentence becomes a looping word-by-word mouth guide. A yellow outline shows the illustrative reference while a blue outline traces measured lip movement when the camera is on. The guide can be replayed slowly, viewed step by step, or used with preset word lessons.
 3. **Understand and retry.** The result separates model guesses from measured evidence: recording quality, duration, volume, pitch, and optional tentative phoneme comparison for single words. Gemma 4 E2B reads the confirmed words and structured measurements to suggest one practical next step. The speaker can replay, focus on a word, and record again.
 
-In the current iPhone prototype, recording and live visual guidance run on the phone while a trusted-network Mac companion runs Whisper, the experimental phoneme model, and Gemma through LiteRT-LM. The separate browser lesson app also offers guided examples and demo feedback. Neither model output nor visual animation is a pronunciation score or diagnosis.
+In both native app modes, recording and live visual guidance run on the phone while a trusted-network Mac companion runs Whisper, the experimental phoneme model, and Gemma through LiteRT-LM. The separate browser lesson app also offers guided examples and demo feedback. Neither model output nor visual animation is a pronunciation score or diagnosis.
+
+## iOS and Pixel app modes
+
+Choose the native app for your phone:
+
+- **iOS:** [SwiftUI app and setup](ios/README.md) for iPhone and iPad.
+- **Google Pixel / Android:** [Kotlin and Jetpack Compose app and setup](android/README.md).
+
+Both apps provide Practice, Mouth Guide, and Results pages. You can type a sentence to create a visual guide, or record speech and confirm the proposed words before reviewing measurements and a practice suggestion. Set up the shared [Mac analysis service](mac_service/README.md) and connect the phone to it on a trusted local network for Whisper and Gemma features. The model runs on the Mac, not on either phone. The [website's phone demo](https://speechlyweb.netlify.app/phone-demo.html) offers iOS and Pixel views of a separate browser preview.
+
+### Where each step runs
+
+```mermaid
+flowchart LR
+    A["iOS or Pixel: record and show visual guide"] -->|audio over trusted local network| B["Mac: Whisper transcript + signal measurements"]
+    B -->|proposed words| A
+    A -->|speaker-confirmed text| C["Mac: Gemma 4 E2B via LiteRT-LM"]
+    B -->|structured voice and optional usable lip summary| C
+    C -->|one practice action| A
+    A -->|record again| B
+```
+
+The Mac can run the models locally without a cloud model API; the phone and Mac still need a trusted local connection. The separate browser lesson app has a distinct, optional Claude feedback path described below.
+
+### Why Gemma is in the loop
+
+Whisper proposes words; it does not decide what the speaker meant. Confirmation can change the target from a mistaken transcript such as **“key”** to the intended **“tea”**. The [analysis pipeline](mac_service/src/speech_mirror/pipeline.py) combines that confirmed text with extracted timing, volume, pitch, and optional sufficiently tracked lip features. The [Gemma coach](mac_service/src/speech_mirror/coach.py) receives those structured values, not raw audio or video, and returns one practice focus and action. Weak evidence should produce a cautious response. The “key → tea” scene on the website is an illustrative preview, not a recorded case study or proof that a specific correction works.
 
 ## The data and models behind the practice loop
 
@@ -140,11 +167,17 @@ Practice, Mouth Guide, and Results pages. Its English free speech flow uses the
 included [Mac analysis service](mac_service/README.md) on port 8765. See
 [ios/README.md](ios/README.md) for the Xcode and iPhone setup.
 
-## Reserved for later development
+## Android app
 
-- Audio analysis (voicing, vowel quality, timing), for example with local speech recognition.
+`android/` contains a native Kotlin / Jetpack Compose version for Google Pixel.
+It uses the same Mac analysis service and three-page English practice flow.
+See [android/README.md](android/README.md) for Android Studio and Pixel setup.
+
+## Reserved for later development in the browser lesson app
+
+- Direct integration of the Mac speech-analysis service into this browser lesson app.
 - A standalone backend for deployment (the feedback handler is ready to move).
-- Local model inference (for example, Gemma), and any fine-tuning.
+- Model inference directly on the phone, and any fine-tuning.
 - User accounts, saved progress, and lesson authoring.
 - Persisting or uploading recordings.
 

@@ -15,15 +15,12 @@ enum SpeechMirrorServiceError: LocalizedError {
 final class SpeechMirrorService {
     static let shared = SpeechMirrorService()
     private init() {}
+    private let wavCache = RecordingWAVCache()
 
     static var baseURL: URL {
         get {
             let saved = UserDefaults.standard.string(forKey: "SpeechMirrorServerURL")
-            let current = URL(string: "http://172.20.10.13:8765")!
-            // Migrate the address saved during the previous Wi-Fi session.
-            // Its host is no longer this Mac, while the chosen port is still 8765.
-            if saved == "http://192.168.0.160:8765" { return current }
-            return URL(string: saved ?? "") ?? current
+            return URL(string: saved ?? "") ?? URL(string: "http://192.168.0.160:8765")!
         }
         set { UserDefaults.standard.set(newValue.absoluteString, forKey: "SpeechMirrorServerURL") }
     }
@@ -32,8 +29,8 @@ final class SpeechMirrorService {
         let configuration = URLSessionConfiguration.default
         // The first request can load Whisper; the confirmed request can also
         // load the phoneme model and Gemma on the Mac.
-        configuration.timeoutIntervalForRequest = 300
-        configuration.timeoutIntervalForResource = 600
+        configuration.timeoutIntervalForRequest = 480
+        configuration.timeoutIntervalForResource = 900
         return URLSession(configuration: configuration)
     }()
 
@@ -42,12 +39,23 @@ final class SpeechMirrorService {
         components.path = "/api/reference"
         components.queryItems = [URLQueryItem(name: "text", value: text)]
         guard let url = components.url else { throw SpeechMirrorServiceError.invalidURL }
-        let (data, response) = try await session.data(for: URLRequest(url: url, timeoutInterval: 30))
-        guard let http = response as? HTTPURLResponse else { throw SpeechMirrorServiceError.server("The Mac service did not return a response.") }
-        if http.statusCode != 200 {
-            throw SpeechMirrorServiceError.server("The Mac service could not generate this reference (HTTP \(http.statusCode)). Check the sentence and try again.")
+        for attempt in 0..<3 {
+            do {
+                let request = URLRequest(url: url, timeoutInterval: [12.0, 20.0, 30.0][attempt])
+                let (data, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse else {
+                    throw SpeechMirrorServiceError.server("The Mac service did not return a response.")
+                }
+                if http.statusCode != 200 {
+                    throw SpeechMirrorServiceError.server("The Mac service could not generate this reference (HTTP \(http.statusCode)). Check the sentence and try again.")
+                }
+                return try JSONDecoder().decode(SentenceReference.self, from: data)
+            } catch let error as URLError where attempt < 2 &&
+                (error.code == .timedOut || error.code == .networkConnectionLost || error.code == .notConnectedToInternet) {
+                try await Task.sleep(for: .milliseconds(300))
+            }
         }
-        return try JSONDecoder().decode(SentenceReference.self, from: data)
+        throw SpeechMirrorServiceError.server("The mouth guide request timed out after retries.")
     }
 
     func analyze(recordingURL: URL, intendedText: String? = nil,
@@ -57,22 +65,23 @@ final class SpeechMirrorService {
         components.path = "/api/analyze"
         components.queryItems = [URLQueryItem(name: "exercise_id", value: "free_speech"),
                                  URLQueryItem(name: "gemma", value: includeGemma ? "true" : "false"),
+                                 URLQueryItem(name: "phonemes", value: includePhonemes ? "true" : "false"),
                                  URLQueryItem(name: "skip_phonemes", value: includePhonemes ? "false" : "true"),
                                  URLQueryItem(name: "language", value: "en")]
         if let intendedText, !intendedText.isEmpty {
             components.queryItems?.append(URLQueryItem(name: "intended_text", value: intendedText))
         }
         guard let url = components.url else { throw SpeechMirrorServiceError.invalidURL }
-        let wav = try WAVEncoder.encode(recordingURL)
+        let wav = try await wavCache.encoded(recordingURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = includeGemma ? 300 : 180
+        request.timeoutInterval = includeGemma ? 480 : (includePhonemes ? 300 : 90)
         request.setValue("audio/wav", forHTTPHeaderField: "Content-Type")
         if let visualFeatures {
             let header = try JSONEncoder().encode(visualFeatures)
             request.setValue(String(decoding: header, as: UTF8.self), forHTTPHeaderField: "X-Speech-Mirror-Visual")
         }
-        let (data, response) = try await session.upload(for: request, from: wav)
+        let (data, response) = try await uploadRecording(request, wav: wav)
         guard let http = response as? HTTPURLResponse else { throw SpeechMirrorServiceError.server("The Mac service did not return a response.") }
         if http.statusCode != 200 {
             throw SpeechMirrorServiceError.server("The Mac service could not analyze this recording (HTTP \(http.statusCode)). Please try again.")
@@ -80,6 +89,35 @@ final class SpeechMirrorService {
         return try JSONDecoder().decode(SpeechMirrorResult.self, from: data)
     }
 
+    private func uploadRecording(_ request: URLRequest, wav: Data) async throws -> (Data, URLResponse) {
+        for attempt in 0..<2 {
+            do {
+                return try await session.upload(for: request, from: wav)
+            } catch let error as URLError where attempt == 0 &&
+                (error.code == .networkConnectionLost || error.code == .notConnectedToInternet) {
+                try await Task.sleep(for: .milliseconds(600))
+            }
+        }
+        throw SpeechMirrorServiceError.server("The recording upload was interrupted. Please retry the analysis.")
+    }
+
+}
+
+/// A confirmed sentence reuses the same recording for measurements, phonemes,
+/// and Gemma. Convert its AAC file only once, off the UI thread.
+private actor RecordingWAVCache {
+    private var recordingURL: URL?
+    private var wav: Data?
+
+    func encoded(_ url: URL) async throws -> Data {
+        if recordingURL == url, let wav { return wav }
+        let data = try await Task.detached(priority: .userInitiated) {
+            try WAVEncoder.encode(url)
+        }.value
+        recordingURL = url
+        wav = data
+        return data
+    }
 }
 
 /// Vision can measure visible lip geometry but not MediaPipe pucker or funnel.
@@ -117,6 +155,7 @@ struct SpeechMirrorResult: Decodable {
         var predicted: [String]?
         var possible_substitutions: [Difference]
         var reason: String?
+        var model: String?
     }
     struct Measurements: Decodable {
         var duration_s: Double

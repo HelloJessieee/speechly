@@ -15,6 +15,7 @@ struct LiveMouthOverlay: View {
     let lips: LiveLipGeometry?
     let params: MouthParams
     let mode: LipOverlayMode
+    let referenceScale: Double
 
     var body: some View {
         Canvas { context, size in
@@ -35,11 +36,13 @@ struct LiveMouthOverlay: View {
                 }
             }
             if mode.showsReference {
-                // Scale to the learner's measured lip width, then vary it by
-                // the reference pose. The center stays attached to their lips.
-                let half = measuredWidth * min(1.14, max(0.86, params.halfWidth / 72)) / 2
-                let opening = measuredWidth * max(0.025, params.open / 125)
-                let outer = opening / 2 + measuredWidth * 0.12
+                // At rest the reference spans the learner's measured mouth.
+                // Wider and rounded poses vary around that calibrated width.
+                let poseWidth = min(1.25, max(0.5, params.halfWidth / 70))
+                let referenceWidth = measuredWidth * referenceScale * poseWidth
+                let half = referenceWidth / 2
+                let opening = referenceWidth * max(0.025, params.open / 125)
+                let outer = opening / 2 + referenceWidth * 0.12
                 var outline = Path()
                 outline.move(to: CGPoint(x: center.x - half, y: center.y))
                 outline.addCurve(to: CGPoint(x: center.x + half, y: center.y),

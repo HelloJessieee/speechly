@@ -6,10 +6,7 @@ struct PracticeCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Eyebrow(text: "Live camera")
-            if model.freeSpeechMode && !model.customReference {
-                Text("Say a sentence. Confirm the transcript to add the yellow reference outline.")
-                    .font(.subheadline).foregroundStyle(Color.mcInkSoft)
-            } else {
+            if !model.freeSpeechMode || model.customReference {
                 Picker("Lip outline", selection: Binding(get: { model.lipOverlayMode }, set: { model.lipOverlayMode = $0 })) {
                     ForEach(LipOverlayMode.allCases, id: \.self) { mode in Text(mode.rawValue).tag(mode) }
                 }
@@ -49,8 +46,6 @@ struct PracticeCard: View {
                     Image(systemName: "camera").font(.title).foregroundStyle(Color.mcSage)
                     Button("Start camera & microphone", systemImage: "camera") { model.startCamera() }.primaryButton()
                     Button("Try demo mode") { model.startDemo() }.secondaryButton()
-                    Text("Free speech audio goes to your Mac for recognition after recording.")
-                        .font(.caption).foregroundStyle(Color.mcInkSoft)
                 }
                 .padding()
             case .demo:
@@ -76,7 +71,8 @@ struct PracticeCard: View {
                     .accessibilityLabel("Your camera preview, mirrored")
                 LiveMouthOverlay(lips: model.camera.liveLips,
                                  params: model.player.sample.params,
-                                 mode: model.lipOverlayMode)
+                                 mode: model.lipOverlayMode,
+                                 referenceScale: model.referenceLipScale)
                 Ellipse()
                     .strokeBorder(.white.opacity(0.9), style: StrokeStyle(lineWidth: 3, dash: [8, 7]))
                     .padding(.horizontal, 60)
@@ -140,8 +136,7 @@ struct PracticeCard: View {
                 Button(model.recorder.isPlaying ? "Stop playback" : "Play recording",
                        systemImage: model.recorder.isPlaying ? "stop.fill" : "play.fill") { model.recorder.togglePlayback() }
                     .secondaryButton()
-                (Text("Mic signal: ").bold() + Text(recording.quiet ? "very quiet" : "sound detected")
-                    + Text(" (loudness only, not pronunciation)").foregroundColor(.mcInkSoft))
+                (Text("Mic signal: ").bold() + Text(recording.quiet ? "very quiet" : "sound detected"))
                     .font(.subheadline)
             }
             Button("Discard recording", systemImage: "trash") { model.resetPractice() }

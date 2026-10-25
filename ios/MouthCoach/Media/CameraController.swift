@@ -77,6 +77,20 @@ final class CameraController {
         if status == .ready { status = .notRequested }
     }
 
+    func ensureRunning() async {
+        if status != .ready {
+            await start()
+            return
+        }
+        let session = self.session
+        await withCheckedContinuation { continuation in
+            sessionQueue.async {
+                if !session.isRunning { session.startRunning() }
+                continuation.resume()
+            }
+        }
+    }
+
     func beginCapture() { processor.beginCapture() }
 
     func endCapture() async -> [CapturedFrame] { await processor.endCapture() }

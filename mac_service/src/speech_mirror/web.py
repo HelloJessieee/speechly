@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -100,6 +101,23 @@ def main() -> None:
     args = parser.parse_args()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Speech Mirror: http://{args.host}:{args.port}", flush=True)
+    def prepare_models() -> None:
+        try:
+            from .coach import model_available, warmup
+            if model_available():
+                elapsed = warmup()
+                print(f"Gemma ready in {elapsed:.0f} ms", flush=True)
+        except Exception as exc:
+            print(f"Gemma warmup unavailable: {exc}", flush=True)
+        try:
+            from .phonemes import MODEL_LOCK, _load, model_available
+            if model_available():
+                with MODEL_LOCK:
+                    _load()
+                print("Phoneme model ready", flush=True)
+        except Exception as exc:
+            print(f"Phoneme warmup unavailable: {exc}", flush=True)
+    threading.Thread(target=prepare_models, daemon=True).start()
     server.serve_forever()
 
 

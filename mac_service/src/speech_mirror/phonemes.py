@@ -6,19 +6,34 @@ uncalibrated hypothesis; no probability is a pronunciation score.
 from __future__ import annotations
 
 from functools import lru_cache
+from collections import OrderedDict
+from hashlib import sha256
 from pathlib import Path
 from time import perf_counter
 from threading import Lock
 import json
+import os
 
 import numpy as np
 
 MODEL = Path(__file__).parents[2] / "models" / "phoneme"
+BEST = Path(__file__).parents[2] / "models" / "pronunciation" / "l2-arctic-ctc" / "best"
 MODEL_LOCK = Lock()
+_RECENT: OrderedDict[tuple[bytes, tuple[str, ...]], dict] = OrderedDict()
+
+
+def weights_path() -> Path:
+    override = os.environ.get("SPEECH_MIRROR_PHONEME_WEIGHTS")
+    if override:
+        return Path(override).expanduser()
+    return BEST if (BEST / "model.safetensors").is_file() else MODEL
 
 
 def model_available() -> bool:
-    return all((MODEL / name).exists() for name in ("config.json", "vocab.json", "pytorch_model.bin", "preprocessor_config.json"))
+    processor_ready = all((MODEL / name).exists() for name in ("config.json", "vocab.json", "preprocessor_config.json"))
+    selected = weights_path()
+    weights_ready = (selected / "config.json").is_file() and any((selected / name).is_file() for name in ("model.safetensors", "pytorch_model.bin"))
+    return processor_ready and weights_ready
 
 
 @lru_cache(maxsize=1)
@@ -39,7 +54,8 @@ def _load():
     tokenizer = Wav2Vec2PhonemeCTCTokenizer.from_pretrained(str(MODEL), local_files_only=True, do_phonemize=False)
     feature_extractor = AutoFeatureExtractor.from_pretrained(str(MODEL), local_files_only=True)
     processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
-    model = AutoModelForCTC.from_pretrained(str(MODEL), local_files_only=True)
+    selected = weights_path()
+    model = AutoModelForCTC.from_pretrained(str(selected), local_files_only=True)
     model.eval()
     if model.config.vocab_size != len(processor.tokenizer.get_vocab()):
         raise ValueError("音素模型和词表大小不一致。")
@@ -71,9 +87,15 @@ def align(target: list[str], predicted: list[str]) -> list[dict]:
 
 def recognize(samples: np.ndarray, target: list[str]) -> tuple[dict, float]:
     started = perf_counter()
-    base = {"status":"unavailable","target":target,"predicted":None,"possible_substitutions":[],"confidence":None}
+    selected = weights_path()
+    label = "L2-ARCTIC fine-tuned candidate" if selected == BEST else "base eSpeak IPA CTC"
+    base = {"status":"unavailable","target":target,"predicted":None,"possible_substitutions":[],"confidence":None,"model":label}
     try:
         with MODEL_LOCK:
+            cache_key = (sha256(samples.tobytes()).digest(), tuple(target))
+            if cache_key in _RECENT:
+                _RECENT.move_to_end(cache_key)
+                return dict(_RECENT[cache_key]), 0.0
             torch, processor, model = _load()
             inputs = processor(samples, sampling_rate=16000, return_tensors="pt")
             with torch.inference_mode():
@@ -93,6 +115,10 @@ def recognize(samples: np.ndarray, target: list[str]) -> tuple[dict, float]:
         else:
             base.update({"status":"tentative","predicted":predicted,"possible_substitutions":align(target,predicted),
                          "reason":"模型给出试验性 IPA 音素假设；短词或口音差异可能造成错误。"})
+        with MODEL_LOCK:
+            _RECENT[cache_key] = dict(base)
+            if len(_RECENT) > 32:
+                _RECENT.popitem(last=False)
     except (FileNotFoundError, ImportError, OSError, ValueError, RuntimeError) as exc:
         base["reason"] = f"本地音素模型不可用：{exc}"
     return base, round((perf_counter()-started)*1000,1)

@@ -63,6 +63,7 @@ class PhonemeAssessment(StrictModel):
     possible_substitutions: list[PhoneDifference]
     confidence: None = None
     reason: str | None = None
+    model: str | None = None
 
 
 class Coach(StrictModel):

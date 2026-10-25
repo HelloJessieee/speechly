@@ -19,15 +19,20 @@ targets:
     platform: iOS
     sources:
       - path: MouthCoach
+        excludes:
+          - ArticulationStudio
+      - path: MouthCoach/ArticulationStudio
+        type: folder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.hellojessieee.speechmirror
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: MouthCoach/Info.plist
       properties:
-        CFBundleDisplayName: MouthCoach
+        CFBundleDisplayName: Speechly
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
@@ -38,9 +43,9 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        NSCameraUsageDescription: MouthCoach shows your camera so you can watch your mouth while you practice. Video stays on your device unless you ask for Claude feedback.
-        NSMicrophoneUsageDescription: MouthCoach records practice attempts for playback and sends them to your configured Mac service for automatic speech recognition after recording.
-        NSLocalNetworkUsageDescription: MouthCoach connects to your Mac Speech Mirror service when you generate a sentence reference or analyze a recording.
+        NSCameraUsageDescription: Speechly shows your camera so you can watch your mouth while you practice. Video stays on your device unless you ask for Claude feedback.
+        NSMicrophoneUsageDescription: Speechly records practice attempts for playback and sends them to your configured Mac service for automatic speech recognition after recording.
+        NSLocalNetworkUsageDescription: Speechly connects to your Mac Speech Mirror service when you generate a sentence reference or analyze a recording.
         # The MouthCoach server that calls Claude. The Simulator can reach the
         # dev server on the same Mac at localhost; on an iPhone use the Mac's
         # address (see ios/README.md). Use HTTPS for any deployed server.

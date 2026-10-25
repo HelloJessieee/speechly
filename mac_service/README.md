@@ -19,10 +19,18 @@ python3.11 -m venv .venv
 .venv/bin/python -m speech_mirror.web --host 0.0.0.0 --port 8765
 ```
 
-The Whisper model is required for automatic transcript suggestions. The
-phoneme and Gemma downloads are needed only for their optional buttons on the
-Results page. Set `SPEECH_MIRROR_ASR_MODEL` or `SPEECH_MIRROR_GEMMA_MODEL` to
-an existing local model path if the files are stored elsewhere.
+The Whisper model is required for automatic transcript suggestions. After the
+user confirms a sentence, the app requests a short-phrase phoneme comparison
+and a Gemma practice suggestion in separate stages. If a model is missing or
+unavailable, measured results and a labelled rule-based practice step remain
+visible. Gemma uses the GPU by default. The service warms Gemma and the phoneme
+model in the background, so the first result request does not have to load them. Set
+`SPEECH_MIRROR_GEMMA_BACKEND=cpu` only when GPU loading fails. The optional
+fine-tuned phoneme checkpoint goes in
+`models/pronunciation/l2-arctic-ctc/best/`; without it the base phoneme model
+is used. This candidate checkpoint still needs a held-out test report.
+Set `SPEECH_MIRROR_ASR_MODEL` or `SPEECH_MIRROR_GEMMA_MODEL` to an existing
+local model path if the files are stored elsewhere.
 
 On iPhone, open **Connection** from the gear icon and enter
 `http://<your Mac LAN IP>:8765`, then tap **Test saved connection**. The Mac and

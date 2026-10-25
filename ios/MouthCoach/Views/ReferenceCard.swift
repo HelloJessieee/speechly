@@ -115,6 +115,13 @@ struct ReferenceCard: View {
                 playbackControls(player: player)
             }
 
+            if model.customReference {
+                Toggle("Vibrate with yellow guide", isOn: Binding(get: { player.hapticPreference },
+                                                                  set: { player.hapticPreference = $0 }))
+                    .font(.subheadline.weight(.semibold))
+                    .tint(.mcSage)
+            }
+
             Toggle("Step-by-step view (no motion)", isOn: Binding(get: { stepMode }, set: { stepModeChoice = $0 }))
                 .font(.subheadline.weight(.semibold))
                 .tint(.mcSage)
@@ -126,14 +133,12 @@ struct ReferenceCard: View {
                         .textInputAutocapitalization(.sentences)
                     HStack {
                         Button("Create looping guide") {
-                            Task { await model.loadSentence(sentenceInput) }
+                            Task { await model.createGuide(from: sentenceInput) }
                         }
                         .secondaryButton()
                         .disabled(model.referenceLoading || sentenceInput.trimmingCharacters(in: .whitespaces).isEmpty)
                         if model.referenceLoading { ProgressView() }
                     }
-                    Text("Uses the Mac speech service.")
-                        .font(.caption).foregroundStyle(Color.mcInkSoft)
                     if let error = model.referenceError { Text(error).font(.footnote).foregroundStyle(Color.mcAmberInk) }
                 }
                 .padding(.top, 8)
@@ -160,10 +165,11 @@ struct ReferenceCard: View {
                 Spacer(minLength: 0)
                 Picker("Playback speed", selection: Binding(get: { player.speed }, set: { player.speed = $0 })) {
                     Text("Normal").tag(1.0)
-                    Text("Slow").tag(0.5)
+                    Text("Slow").tag(0.45)
+                    Text("Slower").tag(0.3)
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 160)
+                .frame(maxWidth: 210)
             }
             HStack {
                 Slider(value: Binding(get: { player.time }, set: { player.seek(to: $0) }), in: 0...max(1, player.duration))

@@ -16,15 +16,19 @@ final class AppModel {
     var animationMode: AnimationMode = .reference
     var practiceMode: PracticeMode = .off
     var lipOverlayMode: LipOverlayMode = .blue
+    var referenceLipScale: Double = 1
     var referenceText = ""
     var referenceWordAtStep: [Int?] = []
     var referenceWords: [String] = []
+    var referenceWordDetails: [ReferenceWord] = []
     var referenceError: String?
     var referenceLoading = false
     var customReference = false
     var mirrorResult: SpeechMirrorResult?
     var mirrorError: String?
     var mirrorLoading = false
+    var fullAnalysisRunning = false
+    var analysisStage: String?
     var gemmaLoading = false
     var gemmaError: String?
     var phonemeLoading = false
@@ -32,6 +36,9 @@ final class AppModel {
     var visualFeatures: SpeechMirrorVisualFeatures?
     var recognizedDraft = ""
     var awaitingIntentConfirmation = false
+    var guideRecordingPendingConfirmation = false
+    var guideCaptureFinishing = false
+    var guideRecordingConfirmed = false
 
     var attempts: [LessonID: [PracticeAttempt]] = [:]
     var currentAttempt: PracticeAttempt?
@@ -43,6 +50,7 @@ final class AppModel {
     let player = ReferencePlayer()
     let camera = CameraController()
     let recorder = AudioRecorder()
+    let guideRecorder = AudioRecorder()
     let speech = SpeechPlayer()
 
     private let demoProvider = DemoFeedbackProvider()
@@ -53,8 +61,8 @@ final class AppModel {
     init() {
         player.load([])
         recorder.onFinish = { [weak self] recording in self?.recordingFinished(recording) }
+        guideRecorder.onFinish = { [weak self] recording in self?.guideRecordingFinished(recording) }
         Task {
-            startCamera()
             await refreshClaudeStatus()
         }
     }
@@ -72,6 +80,7 @@ final class AppModel {
         customReference = false
         referenceText = lesson.text
         referenceWords = []
+        referenceWordDetails = []
         referenceWordAtStep = []
         referenceError = nil
         setAnimationMode(.reference)
@@ -84,12 +93,12 @@ final class AppModel {
         lipOverlayMode = .blue
         referenceText = ""
         referenceWords = []
+        referenceWordDetails = []
         referenceWordAtStep = []
         referenceError = nil
         recognizedDraft = ""
         awaitingIntentConfirmation = false
         player.load([])
-        if practiceMode == .off { startCamera() }
     }
 
     func setAnimationMode(_ mode: AnimationMode) {
@@ -119,22 +128,37 @@ final class AppModel {
         }
         referenceLoading = true
         referenceError = nil
+        let requestID = analysisID
         defer { referenceLoading = false }
         do {
             let reference = try await SpeechMirrorService.shared.reference(for: phrase)
+            guard requestID == analysisID else { return }
             let animation = reference.animation()
             customReference = true
             freeSpeechMode = true
             referenceText = reference.text
             referenceWords = reference.words.map(\.text)
+            referenceWordDetails = reference.words
             referenceWordAtStep = animation.wordAtStep
             animationMode = .reference
             player.load(animation.timeline)
-            lipOverlayMode = .both
+            player.speed = 0.45
+            lipOverlayMode = .yellow
             player.play()
         } catch {
+            guard requestID == analysisID else { return }
             referenceError = error.localizedDescription
         }
+    }
+
+    func createGuide(from text: String) async {
+        let phrase = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !phrase.isEmpty else { referenceError = "Enter the words you want to practice."; return }
+        resetPractice()
+        freeSpeechMode = true
+        customReference = false
+        referenceText = ""
+        await loadSentence(phrase)
     }
 
     // MARK: Practice
@@ -145,12 +169,14 @@ final class AppModel {
         Task {
             await camera.start()
             await recorder.requestPermission()
+            await guideRecorder.requestPermission()
         }
     }
 
     func startDemo() {
         camera.stop()
         recorder.discard()
+        guideRecorder.discard()
         practiceMode = .demo
     }
 
@@ -162,6 +188,14 @@ final class AppModel {
 
     func startRecording() {
         resetPractice()
+        if freeSpeechMode {
+            customReference = false
+            referenceText = ""
+            referenceWords = []
+            referenceWordDetails = []
+            referenceWordAtStep = []
+            player.load([])
+        }
         camera.beginCapture()
         recorder.start(simulated: practiceMode == .demo)
     }
@@ -172,9 +206,21 @@ final class AppModel {
 
     private func recordingFinished(_ recording: AudioRecorder.Recording?) {
         let requestID = analysisID
+        // Recognize first, then analyze this same clip after the user confirms the words.
+        if freeSpeechMode, recording?.url != nil {
+            Task { await recognizeRecording() }
+        }
         Task {
             let frames = await camera.endCapture()
             guard requestID == analysisID else { return }
+            if practiceMode == .live {
+                // Camera recovery must not hold up Whisper after the recorder stops.
+                Task { await camera.ensureRunning() }
+            }
+            if freeSpeechMode {
+                visualFeatures = SpeechMirrorVisualFeatures(frames: frames)
+                return
+            }
             guard let recording else { return }
             let history = attempts[lessonId] ?? []
             let attempt = PracticeAttempt(
@@ -191,9 +237,6 @@ final class AppModel {
             visualFeatures = SpeechMirrorVisualFeatures(frames: frames)
             feedback = nil
             feedbackError = nil
-            mirrorResult = nil
-            mirrorError = nil
-            if freeSpeechMode, recording.url != nil { await recognizeRecording() }
         }
     }
 
@@ -201,6 +244,10 @@ final class AppModel {
         feedbackRequestID += 1
         analysisID += 1
         recorder.discard()
+        guideRecorder.discard()
+        guideRecordingPendingConfirmation = false
+        guideCaptureFinishing = false
+        guideRecordingConfirmed = false
         currentAttempt = nil
         feedback = nil
         feedbackLoading = nil
@@ -208,6 +255,8 @@ final class AppModel {
         mirrorResult = nil
         mirrorError = nil
         mirrorLoading = false
+        fullAnalysisRunning = false
+        analysisStage = nil
         gemmaLoading = false
         gemmaError = nil
         phonemeLoading = false
@@ -242,19 +291,134 @@ final class AppModel {
             mirrorError = "Enter the English words you meant to say. You can correct Whisper's guess."
             return
         }
+        let requestID = analysisID
         mirrorError = nil
+        awaitingIntentConfirmation = false
         await loadSentence(intended)
-        guard customReference, referenceError == nil else {
-            mirrorError = referenceError ?? "Could not create a mouth guide for this sentence."
+        guard requestID == analysisID else { return }
+        guard recorder.recording?.url != nil else {
+            mirrorError = "The recording is no longer available. Please record again."
             return
         }
-        awaitingIntentConfirmation = false
+        // A delayed guide must not block the analysis of a confirmed recording.
+        if !customReference { referenceText = intended }
+        guideRecordingConfirmed = true
+        await analyzeConfirmedRecording()
+    }
+
+    func retryReference() async {
+        guard guideRecordingConfirmed, !referenceText.isEmpty else { return }
+        await loadSentence(referenceText)
+    }
+
+    func startGuideRecording() {
+        guard customReference, !referenceText.isEmpty else { return }
+        feedbackRequestID += 1
+        analysisID += 1
+        guideRecorder.discard()
+        guideRecordingPendingConfirmation = false
+        guideRecordingConfirmed = false
+        guideCaptureFinishing = false
+        currentAttempt = nil
+        visualFeatures = nil
         mirrorResult = nil
+        mirrorError = nil
+        mirrorLoading = false
+        gemmaError = nil
+        gemmaLoading = false
+        phonemeError = nil
+        phonemeLoading = false
+        feedback = nil
+        fullAnalysisRunning = false
+        analysisStage = nil
+        camera.beginCapture()
+        guideRecorder.start(simulated: practiceMode == .demo)
+    }
+
+    func stopGuideRecording() { guideRecorder.stop() }
+
+    private func guideRecordingFinished(_ recording: AudioRecorder.Recording?) {
+        let requestID = analysisID
+        guideCaptureFinishing = true
+        Task {
+            let frames = await camera.endCapture()
+            guard requestID == analysisID else { return }
+            guideCaptureFinishing = false
+            if practiceMode == .live { Task { await camera.ensureRunning() } }
+            guard let recording, recording.url != nil else { return }
+            visualFeatures = SpeechMirrorVisualFeatures(frames: frames)
+            let history = attempts[lessonId] ?? []
+            currentAttempt = PracticeAttempt(
+                id: "guide-\(Int(Date().timeIntervalSince1970 * 1000))",
+                lessonId: lessonId,
+                attemptNumber: history.count + 1,
+                source: .recording,
+                durationMs: recording.duration * 1000,
+                createdAt: Date(),
+                analysis: frames.isEmpty ? nil : summarizeCapture(frames, lesson: lesson)
+            )
+            guideRecordingPendingConfirmation = true
+        }
+    }
+
+    func confirmGuideRecording() async {
+        guard guideRecordingPendingConfirmation, guideRecorder.recording?.url != nil else { return }
+        if guideRecorder.isPlaying { guideRecorder.togglePlayback() }
+        guideRecordingPendingConfirmation = false
+        guideRecordingConfirmed = true
+        if let attempt = currentAttempt { attempts[lessonId, default: []].append(attempt) }
+        await analyzeConfirmedRecording()
+    }
+
+    func discardGuideRecording() {
+        analysisID += 1
+        guideRecorder.discard()
+        guideRecordingPendingConfirmation = false
+        guideRecordingConfirmed = false
+        guideCaptureFinishing = false
+        currentAttempt = nil
+        visualFeatures = nil
+        mirrorResult = nil
+        mirrorError = nil
+        mirrorLoading = false
+        gemmaLoading = false
+        phonemeLoading = false
+        fullAnalysisRunning = false
+        analysisStage = nil
+    }
+
+    var confirmedRecordingURL: URL? {
+        guideRecorder.recording?.url ?? recorder.recording?.url
+    }
+
+    func analyzeConfirmedRecording() async {
+        guard guideRecordingConfirmed, confirmedRecordingURL != nil else {
+            mirrorError = "The recording is no longer available. Record the sentence again."
+            fullAnalysisRunning = false
+            analysisStage = nil
+            return
+        }
+        let requestID = analysisID
+        fullAnalysisRunning = true
+        analysisStage = "Measuring your recording…"
+        defer {
+            if requestID == analysisID {
+                fullAnalysisRunning = false
+                analysisStage = nil
+            }
+        }
         await analyzeRecording()
+        guard requestID == analysisID, mirrorError == nil,
+              mirrorResult?.intent?.confirmed_text != nil else { return }
+        analysisStage = "Comparing tentative phonemes…"
+        await analyzePhonemes()
+        guard requestID == analysisID else { return }
+        analysisStage = "Gemma is preparing your practice suggestion…"
+        await generateGemma()
     }
 
     func analyzeRecording() async {
-        guard let url = recorder.recording?.url else { return }
+        guard let url = confirmedRecordingURL else { return }
         let requestID = analysisID
         mirrorLoading = true
         mirrorError = nil
@@ -271,14 +435,16 @@ final class AppModel {
     }
 
     func generateGemma() async {
-        guard let url = recorder.recording?.url, !referenceText.isEmpty else { return }
+        guard let url = confirmedRecordingURL, !referenceText.isEmpty else { return }
         let requestID = analysisID
         gemmaLoading = true
         gemmaError = nil
         defer { if requestID == analysisID { gemmaLoading = false } }
         do {
+            let usePhonemeEvidence = mirrorResult?.phoneme_assessment.status == "tentative"
             var result = try await SpeechMirrorService.shared.analyze(recordingURL: url, intendedText: referenceText,
-                                                                       includeGemma: true, visualFeatures: visualFeatures)
+                                                                       includeGemma: true, includePhonemes: usePhonemeEvidence,
+                                                                       visualFeatures: visualFeatures)
             guard requestID == analysisID else { return }
             if let previous = mirrorResult, previous.phoneme_assessment.status != "not_run" {
                 result.phoneme_assessment = previous.phoneme_assessment
@@ -292,7 +458,7 @@ final class AppModel {
     }
 
     func analyzePhonemes() async {
-        guard let url = recorder.recording?.url, !referenceText.isEmpty else { return }
+        guard let url = confirmedRecordingURL, !referenceText.isEmpty else { return }
         let requestID = analysisID
         phonemeLoading = true
         phonemeError = nil
@@ -301,6 +467,10 @@ final class AppModel {
             var result = try await SpeechMirrorService.shared.analyze(recordingURL: url, intendedText: referenceText,
                                                                        includePhonemes: true, visualFeatures: visualFeatures)
             guard requestID == analysisID else { return }
+            if result.phoneme_assessment.status == "not_run" {
+                result.phoneme_assessment.status = "unavailable"
+                result.phoneme_assessment.reason = "The Mac service did not run phoneme comparison for this phrase."
+            }
             if let previous = mirrorResult, previous.coach.source == "gemma_local" {
                 result.coach = previous.coach
                 result.performance.gemma_ms = previous.performance.gemma_ms
@@ -354,7 +524,7 @@ final class AppModel {
         case .resetPractice:
             resetPractice()
         case .replayReference:
-            player.speed = 0.5
+            player.speed = 0.45
             fallthrough
         case .showCorrection:
             setAnimationMode(.correction)
