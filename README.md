@@ -31,7 +31,7 @@ Two real frames for each page of the native iPhone app show the full practice fl
 <table>
   <tr><th>1 · Practice</th><th>2 · Mouth Guide</th><th>3 · Results</th></tr>
   <tr>
-    <td><strong>Confirm your words</strong><br><img src="docs/assets/app-practice-confirm.jpg" alt="Practice screen showing the editable speech recognition guess and confirmed words" width="220"></td>
+    <td><strong>Confirm your words</strong><br><img src="docs/assets/app-practice-words.jpg" alt="Close-up of the Practice screen showing the recognized sentence, editable words, and Use these words button" width="220"></td>
     <td><strong>Follow the reference</strong><br><img src="docs/assets/app-mouth-guide.jpg" alt="Mouth Guide screen highlighting a word beside the animated reference mouth" width="220"></td>
     <td><strong>Review the evidence</strong><br><img src="docs/assets/app-results.jpg" alt="Results screen showing a voice trace and a suggested next practice step" width="220"></td>
   </tr>
