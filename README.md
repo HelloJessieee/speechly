@@ -6,6 +6,8 @@
 
 > **Built with LiteRT-LM.** Speechly runs **Gemma 4 E2B locally on the Mac through LiteRT-LM**. The iOS and Pixel apps record speech and show the practice guide; the Mac service loads the `.litertlm` model, uses the GPU backend by default, and returns one suggestion based on speaker-confirmed words and measured signals. The model does not run in the phone apps or the website's browser preview.
 
+> **Our fine-tuning.** We fine-tuned a Wav2Vec2 CTC phoneme recognizer on manually annotated L2-ARCTIC speech to study the sounds a speaker produced. The [published adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) document the training and validation results. This experimental phoneme model is separate from Gemma; **we did not fine-tune Gemma**.
+
 ### Being understood changes what someone can do next.
 
 Imagine rehearsing a sentence before speaking in class, asking for help, or joining a conversation. You say it aloud, and a speech recognizer returns different words. The speaker knows what they meant; the model only has a guess. For people with speech disabilities, being misunderstood can make ordinary moments harder to enter. A practice tool should not turn that uncertainty into a verdict about the person.
@@ -77,9 +79,15 @@ Whisper proposes words; it does not decide what the speaker meant. Confirmation 
 
 ## The data and models behind the practice loop
 
-Whisper drafts the transcript, and the speaker confirms what they meant. For research into what sounds were *actually produced*, we used the manually annotated [L2-ARCTIC dataset](https://psi.engr.tamu.edu/l2-arctic-corpus-docs/) of English learners to fine-tune an existing phoneme recognition model for one round. The [public research checkpoint](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) includes the updated weights and instructions to restore the complete model; it contains no recordings or annotations. L2-ARCTIC has a noncommercial license.
+Whisper drafts the transcript, and the speaker confirms what they meant. The phoneme model has a separate research role: estimating the sounds produced in English read speech, not deciding the speaker's intended words.
 
-Gemma 4 E2B has a different job. It runs **locally on the Mac through LiteRT-LM**, using the speaker-confirmed words and measured voice and lip signals to suggest one practical action to try next. We did not fine-tune Gemma. The phoneme checkpoint improved on validation data, but false alarms remain common and the independent test is unfinished. It is not part of the current web experience and cannot support confident individual corrections or claims about people with speech disabilities.
+### Our fine-tuned phoneme model
+
+We started from [`facebook/wav2vec2-lv-60-espeak-cv-ft`](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) and fine-tuned its top two acoustic transformer layers and CTC head for one epoch on 3,380 usable, manually annotated [L2-ARCTIC](https://psi.engr.tamu.edu/l2-arctic-corpus-docs/) utterances. Speakers were split between training, validation, and a reserved test set. On the 888-utterance validation split, phone error rate fell from **28.24% to 20.08%**; error-location precision rose from **17.20% to 25.98%**. These are validation results, not performance claims for new speakers or clinical use.
+
+The [public research adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) contain the updated weights and restoration instructions, without speech recordings or annotations. The held-out test is unfinished, false alarms remain common, and the L2-ARCTIC license restricts commercial use. The Mac service can use the restored checkpoint when installed; otherwise it uses the base phoneme model.
+
+Gemma 4 E2B has a different job. It runs **locally on the Mac through LiteRT-LM**, using the speaker-confirmed words and measured voice and lip signals to suggest one practical action to try next. We did not fine-tune Gemma. The phoneme checkpoint is not part of the current web experience and cannot support confident individual corrections or claims about people with speech disabilities.
 
 ## Browser lesson app: setup and run
 
