@@ -8,13 +8,17 @@
 
 > **Our fine-tuning.** We fine-tuned a Wav2Vec2 CTC phoneme recognizer on manually annotated L2-ARCTIC speech to study the sounds a speaker produced. The [published adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) document the training and validation results. This experimental phoneme model is separate from Gemma; **we did not fine-tune Gemma**.
 
-### Being understood changes what someone can do next.
+## Why Speechly matters
+
+**Being understood changes what someone can do next.**
+
+Speaking practice often relies on hearing your own voice and noticing what to change. Some people who are deaf or hard of hearing cannot rely on that feedback. Speech therapists and teachers provide essential support, but they cannot be present for every short practice attempt between sessions. Speechly's social purpose is to make part of that feedback visible so people can keep practicing at their own pace.
 
 Imagine rehearsing a sentence before speaking in class, asking for help, or joining a conversation. You say it aloud, and a speech recognizer returns different words. The speaker knows what they meant; the model only has a guess. For people with speech disabilities, being misunderstood can make ordinary moments harder to enter. A practice tool should not turn that uncertainty into a verdict about the person.
 
 Speechly gives that choice back to the speaker. They record a sentence, review what the model heard, and confirm their own words. A word-by-word mouth guide can be viewed alongside their lip movement. Voice measurements and a locally generated Gemma suggestion then turn the attempt into one concrete action to try next.
 
-We are building for English learners and people with speech differences, including people with speech disabilities who may benefit from visual cues and a private place to rehearse. The social goal is simple: give more people tools to participate in everyday communication on their own terms. Speechly supports practice; it does not replace a speech-language professional or claim a clinical benefit that has not been demonstrated.
+We are building for people who may benefit from visual cues and a private place to rehearse, including deaf and hard-of-hearing speakers, people with speech differences, and English learners. The social goal is to give more people tools to participate in everyday communication on their own terms. The current practice flow focuses on English; expanding the approach to more languages is a future direction. Speechly supports practice; it does not replace a speech-language professional or claim a clinical benefit that has not been demonstrated.
 
 **Speak → See → Improve.** Record and confirm your words; follow a visual guide; review the evidence, practice one action, and try again.
 
