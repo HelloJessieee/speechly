@@ -4,6 +4,8 @@
 
 **Website:** [Speechly product site](https://speechlyweb.netlify.app/) — the story, complete practice flow, team, and interactive 3D guide.
 
+> **Built with LiteRT-LM.** Speechly runs **Gemma 4 E2B locally on the Mac through LiteRT-LM**. The iOS and Pixel apps record speech and show the practice guide; the Mac service loads the `.litertlm` model, uses the GPU backend by default, and returns one suggestion based on speaker-confirmed words and measured signals. The model does not run in the phone apps or the website's browser preview.
+
 ### Being understood changes what someone can do next.
 
 Imagine rehearsing a sentence before speaking in class, asking for help, or joining a conversation. You say it aloud, and a speech recognizer returns different words. The speaker knows what they meant; the model only has a guess. For people with speech disabilities, being misunderstood can make ordinary moments harder to enter. A practice tool should not turn that uncertainty into a verdict about the person.
@@ -64,6 +66,10 @@ flowchart LR
 ```
 
 The Mac runs the models locally; the phone and Mac still need a trusted local connection.
+
+### LiteRT-LM implementation
+
+The [Gemma coach](mac_service/src/speech_mirror/coach.py) creates a `litert_lm.Engine` from the local `.litertlm` model and selects the GPU backend by default; a CPU backend is configurable. The [analysis pipeline](mac_service/src/speech_mirror/pipeline.py) passes confirmed text and structured measurements to the coach and records inference time as `performance.gemma_ms`. See the [Mac service setup](mac_service/README.md) for the model download and launch commands.
 
 ### Why Gemma is in the loop
 
