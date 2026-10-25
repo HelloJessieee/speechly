@@ -23,6 +23,8 @@ data class AnalysisResult(
             val coach = json.getJSONObject("coach")
             val visuals = json.getJSONObject("visual_data")
             val differences = phone.optJSONArray("possible_substitutions") ?: JSONArray()
+            fun optionalString(source: JSONObject, key: String): String? =
+                if (source.isNull(key)) null else source.optString(key).ifBlank { null }
             fun strings(array: JSONArray?): List<String> = array?.let { (0 until it.length()).map(it::getString) } ?: emptyList()
             fun trace(key: String, field: String): List<PlotPoint> {
                 val points = visuals.optJSONArray(key) ?: return emptyList()
@@ -41,22 +43,21 @@ data class AnalysisResult(
                 duration = measures.optDouble("duration_s"), voiced = measures.optDouble("voiced_duration_s"),
                 rmsDbfs = measures.optDouble("rms_dbfs"),
                 medianPitch = if (measures.isNull("median_f0_hz")) null else measures.optDouble("median_f0_hz"),
-                comparison = json.optJSONObject("intent")?.let {
-                    if (it.isNull("comparison")) null else it.optString("comparison").ifBlank { null }
-                },
+                comparison = json.optJSONObject("intent")?.let { optionalString(it, "comparison") },
                 coachSource = coach.optString("source"), feedback = coach.optString("feedback"),
                 nextExercise = coach.optString("next_exercise"), phoneStatus = phone.optString("status"),
                 targetPhones = strings(phone.optJSONArray("target")),
                 predictedPhones = strings(phone.optJSONArray("predicted")),
                 phoneDifferences = (0 until differences.length()).map { index ->
                     differences.getJSONObject(index).let {
-                        PhoneDifference(it.optString("type"), it.optString("expected").ifBlank { null },
-                            it.optString("observed").ifBlank { null })
+                        PhoneDifference(it.optString("type"), optionalString(it, "expected"),
+                            optionalString(it, "observed"))
                     }
                 },
                 pitch = trace("pitch_trace", "f0_hz"), volume = trace("volume_trace", "dbfs"),
-                phoneReason = phone.optString("reason"), phoneModel = phone.optString("model"),
-                coachReason = coach.optString("reason"),
+                phoneReason = optionalString(phone, "reason").orEmpty(),
+                phoneModel = optionalString(phone, "model").orEmpty(),
+                coachReason = optionalString(coach, "reason").orEmpty(),
             )
         }
     }

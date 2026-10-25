@@ -492,7 +492,7 @@ private fun ResultsPage(model: SpeechMirrorModel) {
             "The phoneme model could not compare this recording."), color = SoftInk)
         if (phones.targetPhones.isNotEmpty()) Text("Target: /${phones.targetPhones.joinToString(" ")}/")
         if (phones.predictedPhones.isNotEmpty()) Text("Model heard: /${phones.predictedPhones.joinToString(" ")}/")
-        phones.phoneDifferences.forEach {
+        phones.phoneDifferences.take(4).forEach {
             Text("Possible ${it.type}: ${it.expected ?: "—"} → ${it.observed ?: "—"}")
         }
         Text("Differences may reflect model error or accent; they are not a score.",
