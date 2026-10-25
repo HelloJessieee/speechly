@@ -31,7 +31,7 @@ Three frames from the native iPhone recording show the full practice flow:
 <table>
   <tr><th>1 · Practice</th><th>2 · Mouth Guide</th><th>3 · Results</th></tr>
   <tr>
-    <td><img src="docs/assets/app-practice.jpg" alt="Practice screen showing the editable speech recognition guess and confirmed words" width="220"></td>
+    <td><img src="docs/assets/app-practice.jpg" alt="Practice screen showing a woman recording speech while a blue outline tracks her lips" width="220"></td>
     <td><img src="docs/assets/app-mouth-guide.jpg" alt="Mouth Guide screen highlighting a word beside the animated reference mouth" width="220"></td>
     <td><img src="docs/assets/app-results.jpg" alt="Results screen showing a voice trace and a suggested next practice step" width="220"></td>
   </tr>
