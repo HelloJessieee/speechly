@@ -30,6 +30,12 @@ The current published prototype includes a native iPhone app, a browser-based le
 
 In the current iPhone prototype, recording and live visual guidance run on the phone while a trusted-network Mac companion runs Whisper, the experimental phoneme model, and Gemma through LiteRT-LM. The separate browser lesson app also offers guided examples and demo feedback. Neither model output nor visual animation is a pronunciation score or diagnosis.
 
+## The data and models behind the practice loop
+
+Whisper drafts the transcript, and the speaker confirms what they meant. For research into what sounds were *actually produced*, we used the manually annotated [L2-ARCTIC dataset](https://psi.engr.tamu.edu/l2-arctic-corpus-docs/) of English learners to fine-tune an existing phoneme recognition model for one round. The [public research checkpoint](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) includes the updated weights and instructions to restore the complete model; it contains no recordings or annotations. L2-ARCTIC has a noncommercial license.
+
+Gemma 4 E2B has a different job. It runs **locally on the Mac through LiteRT-LM**, using the speaker-confirmed words and measured voice and lip signals to suggest one practical action to try next. We did not fine-tune Gemma. The phoneme checkpoint improved on validation data, but false alarms remain common and the independent test is unfinished. It is not part of the current web experience and cannot support confident individual corrections or claims about people with speech disabilities.
+
 ## Browser lesson app: setup and run
 
 Requires Node.js 20 or newer.
