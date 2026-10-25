@@ -30,6 +30,44 @@ The current published prototype includes a native iPhone app, a browser-based le
 
 In the current iPhone prototype, recording and live visual guidance run on the phone while a trusted-network Mac companion runs Whisper, the experimental phoneme model, and Gemma through LiteRT-LM. The separate browser lesson app also offers guided examples and demo feedback. Neither model output nor visual animation is a pronunciation score or diagnosis.
 
+## Award evidence and verification
+
+**The promise:** record a sentence, correct the model's guess about your words, see a visual guide, get one evidence-based practice action, and try again. This is the iPhone + Mac prototype described above. [Explore the product website](https://speechlyweb.netlify.app/) and its [step-by-step flow](https://speechlyweb.netlify.app/how.html).
+
+| Target award | Current evidence | Evidence still needed |
+| --- | --- | --- |
+| Mobile AI / App Track | Native iPhone interface and a connected recording → confirmation → visual guide → Gemma suggestion → retry flow. [iOS setup](ios/README.md), [Mac service setup](mac_service/README.md). | A public, uncut real-device walkthrough of the complete loop. |
+| Best Use of LiteRT | Gemma 4 E2B inference runs locally on the Mac via LiteRT-LM. The [inference code](mac_service/src/speech_mirror/coach.py) loads the `.litertlm` model and selects a GPU backend by default, with a CPU option. The [pipeline](mac_service/src/speech_mirror/pipeline.py) records `gemma_ms`. | Publish the exact Mac model/configuration, representative inference latency, and peak memory measured during the walkthrough. No benchmark numbers are claimed here yet. |
+| Best in Show / Android & Pixel | A Kotlin/Jetpack Compose Android prototype is under development with the same Mac service architecture. | Publish and verify the Android source, then capture a Pixel end-to-end and offline run with the exact device and compute location. This README does not claim a verified Pixel experience. |
+
+The award names are targets; eligibility and judging are determined by the organizers.
+
+### Where each step runs
+
+```mermaid
+flowchart LR
+    A["iPhone: record and show visual guide"] -->|audio over trusted local network| B["Mac: Whisper transcript + signal measurements"]
+    B -->|proposed words| A
+    A -->|speaker-confirmed text| C["Mac: Gemma 4 E2B via LiteRT-LM"]
+    B -->|structured voice and optional usable lip summary| C
+    C -->|one practice action| A
+    A -->|record again| B
+```
+
+The Android/Pixel prototype is being developed against the same Mac companion. The current architecture does **not** place Gemma inference on either phone. The Mac can run the models locally without a cloud model API; the phone and Mac still need a trusted local connection. The separate browser lesson app has a distinct, optional Claude feedback path described below and is not the evidence for local Gemma inference.
+
+### Why Gemma is in the loop
+
+Whisper proposes words; it does not decide what the speaker meant. Confirmation can change the target from a mistaken transcript such as **“key”** to the intended **“tea”**. The [analysis pipeline](mac_service/src/speech_mirror/pipeline.py) combines that confirmed text with extracted timing, volume, pitch, and optional sufficiently tracked lip features. The [Gemma coach](mac_service/src/speech_mirror/coach.py) receives those structured values, not raw audio or video, and returns one practice focus and action. Weak evidence should produce a cautious response. The “key → tea” scene on the website is an illustrative preview, not a recorded case study or proof that a specific correction works.
+
+### Reproduce and measure
+
+1. Follow [Mac service setup](mac_service/README.md) for its Python environment, `gemma-4-E2B-it.litertlm` model download, and service launch. The model file is downloaded separately; it is not committed here.
+2. Follow [iOS setup](ios/README.md), connect the iPhone to the Mac service on a trusted local network, and complete the three-page practice loop. Record the phone and Mac screens together so the input, confirmation, suggestion, and retry can be checked.
+3. Capture the Mac model/backend, OS and hardware, network conditions, and response `performance.gemma_ms` from the [pipeline response](mac_service/src/speech_mirror/pipeline.py). Measure peak process memory separately during the same run. Include repeated runs and the conditions with any published numbers.
+
+**Evidence status (24 October 2026):** no real-device video, Pixel validation result, or device latency/peak-memory benchmark is published in this repository. The site preview and 3D guide are illustrative. The single-word phoneme comparison is experimental; its independent test is unfinished. No clinical or individual pronunciation-correction claim follows from it.
+
 ## The data and models behind the practice loop
 
 Whisper drafts the transcript, and the speaker confirms what they meant. For research into what sounds were *actually produced*, we used the manually annotated [L2-ARCTIC dataset](https://psi.engr.tamu.edu/l2-arctic-corpus-docs/) of English learners to fine-tune an existing phoneme recognition model for one round. The [public research checkpoint](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) includes the updated weights and instructions to restore the complete model; it contains no recordings or annotations. L2-ARCTIC has a noncommercial license.
