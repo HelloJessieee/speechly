@@ -4,6 +4,8 @@
 
 模型由 `rig.js` 在运行时程序化生成，并通过 JavaScript 动态修改网格与部件变换来运动。交付内容包含可继续修改的模型源码；目前没有导出为带 morph targets 的 GLB 资产。后续若需要在其他引擎中使用，可再建立对应的骨骼或形态键资产与参数映射。
 
+面部比例的研究参考、实际实现和前后测量见 [PROPORTIONS.md](PROPORTIONS.md)。
+
 ## 本地打开
 
 解压项目后，在包含 `dist` 文件夹的项目目录打开终端，运行：
@@ -21,6 +23,7 @@ python3 -m http.server 4173 --directory dist
 | 文件 / 文件夹 | 用途 |
 | --- | --- |
 | `README.md` | 项目打开方法与完整接入说明，即本文 |
+| `PROPORTIONS.md` / `dist/PROPORTIONS.md` | 面部比例的研究依据、实现边界和前后测量 |
 | `dist/index.html` | 网页入口 |
 | `dist/style.css` | 工作台的界面样式 |
 | `dist/app.js` | 将界面、场景与动作控制器连接起来 |

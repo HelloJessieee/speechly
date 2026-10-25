@@ -13,6 +13,8 @@ export function createCharacter() {
   const materialRoles = new Map();
   const solidMaterials = new Map();
   const trackedMeshes = [];
+  const restShapeEntries = [];
+  let restShapeReady = false;
   let cutaway = false;
   let wireframe = false;
 
@@ -95,7 +97,8 @@ export function createCharacter() {
     const x = mouthWidth * c;
     const upper = s > 0;
     const cupid = upper ? -0.016 * Math.exp(-(((x / Math.max(mouthWidth, 0.01)) / 0.22) ** 2)) * (1 - state.lipRound) : 0;
-    const cornerSmile = state.smile * 0.105 * Math.abs(c) ** 2;
+    const cornerSmile = (0.022 + state.smile * 0.105) * Math.abs(c) ** 2
+      * (1 - state.jawOpen * 0.75) * (1 - state.lipRound * 0.8);
     const raise = upper ? 0.075 * state.upperLipRaise * s : -0.075 * state.lowerLipDepress * -s;
     const y = mouthCenter + mouthHeight * s + cornerSmile + cupid + raise * (1 - state.lipClose);
     const z = surfaceZ(x, y) + 0.044 + 0.145 * state.lipRound;
@@ -134,7 +137,8 @@ export function createCharacter() {
         let z = surfaceZ(x, baseY) + (0.044 + 0.145 * state.lipRound) * (1 - t) ** 7;
         const left = gaussian(x, baseY, 0.79, -0.22, 0.4, 0.42);
         const right = gaussian(x, baseY, -0.79, -0.22, 0.4, 0.42);
-        const fade = Math.sin(t * Math.PI / 2);
+        // Keep the shared front/back outline coincident during cheek motion.
+        const fade = Math.sin(t * Math.PI);
         const pL = state.cheekPuffLeft, pR = state.cheekPuffRight;
         z += 0.19 * (left * pL + right * pR) * fade;
         x += 0.065 * (left * pL - right * pR) * fade;
@@ -210,10 +214,10 @@ export function createCharacter() {
     const brow = curveTube(`Brow${sign}`, [[sign * 0.2, 0.7, 0.97], [sign * 0.36, 0.787, 0.981], [sign * 0.55, 0.785, 0.916], [sign * 0.69, 0.704, 0.862]], 0.035, hairDark);
     eyes.push({ sign, eye, closed, brow, lid });
   }
-  ellipsoid('NoseBridge', skin, [0, -0.04, 1.04], [0.105, 0.185, 0.13]);
-  ellipsoid('NoseTip', earSkin, [0, -0.185, 1.12], [0.145, 0.12, 0.15]);
+  ellipsoid('NoseBridge', skin, [0, -0.08, 1.025], [0.105, 0.125, 0.08]);
+  ellipsoid('NoseTip', earSkin, [0, -0.185, 1.10], [0.145, 0.12, 0.115]);
   for (const sign of [-1, 1]) {
-    ellipsoid(`Nostril${sign}`, nostril, [sign * 0.065, -0.235, 1.225], [0.023, 0.013, 0.008]);
+    ellipsoid(`Nostril${sign}`, nostril, [sign * 0.065, -0.235, 1.191], [0.023, 0.013, 0.007]);
   }
   const cheeks = [];
   for (const sign of [-1, 1]) {
@@ -540,7 +544,7 @@ export function createCharacter() {
 
   function lipThickness(upper) {
     const openness = smooth(mouthHeight / 0.15);
-    return (upper ? mix(0.024, 0.039, openness) : mix(0.03, 0.051, openness)) * (1 + state.lipRound * 0.36);
+    return (upper ? mix(0.03, 0.039, openness) : mix(0.039, 0.051, openness)) * (1 + state.lipRound * 0.36);
   }
 
   function innerLipBounds(x) {
@@ -700,9 +704,25 @@ export function createCharacter() {
   }
 
   function updateMouth() {
-    mouthWidth = clamp((0.37 + state.jawOpen * 0.095 + state.lipSpread * 0.22 + state.smile * 0.1 - state.lipRound * 0.205) * (1 - state.lipClose * 0.13), 0.145, 0.76);
-    mouthHeight = (0.014 + state.jawOpen * 0.345 + state.lipRound * 0.12 + state.tongueOut * 0.075) * (1 - state.lipClose * 0.985);
+    mouthWidth = clamp((0.37 + state.jawOpen * 0.055 + state.lipSpread * 0.22 + state.smile * 0.1 - state.lipRound * 0.205) * (1 - state.lipClose * 0.13), 0.145, 0.76);
+    // Compensate jaw articulation for the shorter identity shape. The neutral
+    // shape stays fixed while AH retains a useful vertical opening after warp.
+    mouthHeight = (0.014 + state.jawOpen * 0.50 + state.lipRound * 0.12 + state.tongueOut * 0.075) * (1 - state.lipClose * 0.985);
     mouthCenter = -0.57 - state.jawOpen * 0.20 - state.lowerLipDepress * 0.035 + state.upperLipRaise * 0.018;
+    let heightLimit = mouthHeight;
+    for (let c = 0; c < sides; c++) {
+      const angle = c / sides * Math.PI * 2, sine = Math.sin(angle), cosine = Math.cos(angle);
+      if (Math.abs(sine) < 1e-6) continue;
+      const point = mouthPoint(angle);
+      const baseY = point.y - mouthHeight * sine;
+      const outerThickness = (sine > 0 ? 0.039 : 0.051) * (1 + state.lipRound * 0.36);
+      const outerX = point.x + cosine * outerThickness;
+      const allowedY = (ry - 0.085) * Math.sqrt(Math.max(0, 1 - (outerX / (rx - 0.035)) ** 2));
+      const edgeY = sine > 0 ? allowedY : -allowedY;
+      heightLimit = Math.min(heightLimit, (edgeY - baseY - sine * outerThickness) / sine);
+    }
+    // Combined round/protrude/depress poses retain a complete strip of chin.
+    mouthHeight = Math.max(0, Math.min(mouthHeight, heightLimit));
     const lip = lipGeometry.attributes.position.array;
     let index = 0;
     for (let row = 0; row <= lipRows; row++) {
@@ -766,12 +786,160 @@ export function createCharacter() {
     tongueGeometry.attributes.position.needsUpdate = true;
   }
 
+  // Identity shape and expression stay separate. The articulation solve above
+  // works in its canonical bind space; this one shared, smooth deformation then
+  // carries every surface into the reference's short, rounded child proportions.
+  // The triangular Jacobian has strictly positive diagonal entries, preserving
+  // orientation and the contacts established between skin, lips and oral parts.
+  const shapeY = [-3, -2.3, -1.95, -1.51, -0.57, -0.2, 0.265, 0.75, 1.51, 1.7];
+  const shapeTargetY = [-2.15, -1.45, -1.1, -0.92, -0.38, -0.1, 0.265, 0.66, 1.42, 1.61];
+  const shapeSlopes = shapeY.slice(1).map((y, i) => (shapeTargetY[i + 1] - shapeTargetY[i]) / (y - shapeY[i]));
+  const shapeTangents = shapeY.map((y, i) => {
+    if (i === 0) return shapeSlopes[0];
+    if (i === shapeY.length - 1) return shapeSlopes.at(-1);
+    const before = y - shapeY[i - 1], after = shapeY[i + 1] - y;
+    const w1 = 2 * after + before, w2 = after + 2 * before;
+    return (w1 + w2) / (w1 / shapeSlopes[i - 1] + w2 / shapeSlopes[i]);
+  });
+  const shapeSegments = shapeSlopes.map((slope, i) => {
+    const h = shapeY[i + 1] - shapeY[i];
+    return {
+      h, a: 2 * shapeTargetY[i] - 2 * shapeTargetY[i + 1] + h * (shapeTangents[i] + shapeTangents[i + 1]),
+      b: -3 * shapeTargetY[i] + 3 * shapeTargetY[i + 1] - h * (2 * shapeTangents[i] + shapeTangents[i + 1]),
+      c: h * shapeTangents[i], d: shapeTargetY[i],
+    };
+  });
+  const shapeResult = { x: 0, y: 0, z: 0, xx: 1, xy: 0, yy: 1, zy: 0, zz: 1 };
+  function referenceShape(x, y, z) {
+    let finalY, derivativeY;
+    if (y <= shapeY[0]) {
+      derivativeY = shapeTangents[0]; finalY = shapeTargetY[0] + (y - shapeY[0]) * derivativeY;
+    } else if (y >= shapeY.at(-1)) {
+      derivativeY = shapeTangents.at(-1); finalY = shapeTargetY.at(-1) + (y - shapeY.at(-1)) * derivativeY;
+    } else {
+      let i = 0;
+      while (shapeY[i + 1] < y) i++;
+      const segment = shapeSegments[i], t = (y - shapeY[i]) / segment.h;
+      finalY = ((segment.a * t + segment.b) * t + segment.c) * t + segment.d;
+      derivativeY = (3 * segment.a * t * t + 2 * segment.b * t + segment.c) / segment.h;
+    }
+    const eyeField = 0.14 * Math.exp(-(((y - 0.265) / 0.4) ** 2));
+    const noseField = 0.35 * Math.exp(-(((y + 0.185) / 0.16) ** 2));
+    const cheekField = 0.025 * Math.exp(-(((y + 0.38) / 0.55) ** 2));
+    const mouthField = 0.18 * Math.exp(-(((y + 0.57) / 0.18) ** 2));
+    const eyeX4 = (x / 0.8) ** 4, noseX4 = (x / 0.24) ** 4, mouthX4 = (x / 0.65) ** 4;
+    const eyeFalloff = Math.exp(-eyeX4), noseFalloff = Math.exp(-noseX4), mouthFalloff = Math.exp(-mouthX4);
+    const width = 1 + cheekField + eyeField * eyeFalloff - noseField * noseFalloff - mouthField * mouthFalloff;
+    const derivativeX = 1 + cheekField + eyeField * eyeFalloff * (1 - 4 * eyeX4)
+      - noseField * noseFalloff * (1 - 4 * noseX4) - mouthField * mouthFalloff * (1 - 4 * mouthX4);
+    const widthY = -2 * (y + 0.38) / (0.55 ** 2) * cheekField
+      - 2 * (y - 0.265) / (0.4 ** 2) * eyeField * eyeFalloff
+      + 2 * (y + 0.185) / (0.16 ** 2) * noseField * noseFalloff
+      + 2 * (y + 0.57) / (0.18 ** 2) * mouthField * mouthFalloff;
+    const depthField = 0.3 * Math.exp(-(((y - 0.15) / 0.55) ** 2));
+    const depthY = -2 * (y - 0.15) / (0.55 ** 2) * depthField;
+    const depthArgument = 16 * (z - 0.9);
+    const softDepth = Math.log1p(Math.exp(depthArgument)) / 16;
+    const depthDerivative = 1 / (1 + Math.exp(-depthArgument));
+    shapeResult.x = x * width; shapeResult.y = finalY; shapeResult.z = z - depthField * softDepth;
+    shapeResult.xx = derivativeX; shapeResult.xy = x * widthY; shapeResult.yy = derivativeY;
+    shapeResult.zy = -depthY * softDepth; shapeResult.zz = 1 - depthField * depthDerivative;
+    return shapeResult;
+  }
+
+  function captureRestShape() {
+    const objects = [...trackedMeshes, tongueGroove];
+    const counts = new Map();
+    for (const object of objects) counts.set(object.geometry, (counts.get(object.geometry) || 0) + 1);
+    const dynamicGeometry = new Set([frontGeometry, backGeometry, lipGeometry, cavityGeometry, tongueGeometry, lineGeometry]);
+    for (const object of objects) {
+      // Ellipsoids share one unit sphere during authoring. Each needs its own
+      // buffer before a deformation is baked in its individual local space.
+      if (counts.get(object.geometry) > 1) {
+        object.geometry = object.geometry.clone(); geometries.add(object.geometry);
+      }
+      const geometry = object.geometry;
+      geometry.computeBoundingBox();
+      restShapeEntries.push({
+        object, geometry, positions: geometry.attributes.position.array.slice(),
+        normals: geometry.attributes.normal?.array.slice(), box: geometry.boundingBox.clone(),
+        matrix: new THREE.Matrix4(), inverse: new THREE.Matrix4(),
+        normalMatrix: new THREE.Matrix3(), inverseNormal: new THREE.Matrix3(),
+        dynamic: dynamicGeometry.has(geometry), lastMatrix: null,
+      });
+    }
+    restShapeReady = true;
+  }
+
+  function restoreRestShape() {
+    if (!restShapeReady) return;
+    for (const entry of restShapeEntries) {
+      entry.geometry.attributes.position.array.set(entry.positions);
+      if (entry.normals) entry.geometry.attributes.normal.array.set(entry.normals);
+      entry.geometry.boundingBox.copy(entry.box);
+    }
+  }
+
+  function applyRestShape() {
+    if (!restShapeReady) return;
+    for (const entry of restShapeEntries) {
+      const { object, geometry, matrix, inverse, normalMatrix, inverseNormal } = entry;
+      object.updateMatrix(); matrix.copy(object.matrix);
+      let parent = object.parent;
+      while (parent && parent !== group) { parent.updateMatrix(); matrix.premultiply(parent.matrix); parent = parent.parent; }
+      if (!entry.dynamic && entry.lastMatrix?.equals(matrix)) {
+        geometry.attributes.position.array.set(entry.finalPositions);
+        if (entry.finalNormals) geometry.attributes.normal.array.set(entry.finalNormals);
+        geometry.attributes.position.needsUpdate = true;
+        if (entry.finalNormals) geometry.attributes.normal.needsUpdate = true;
+        geometry.boundingBox.copy(entry.finalBox); geometry.boundingSphere.copy(entry.finalSphere);
+        continue;
+      }
+      inverse.copy(matrix).invert();
+      normalMatrix.getNormalMatrix(matrix); inverseNormal.copy(normalMatrix).invert();
+      const m = matrix.elements, im = inverse.elements, nm = normalMatrix.elements, inn = inverseNormal.elements;
+      const p = geometry.attributes.position.array, normals = geometry.attributes.normal?.array;
+      for (let i = 0; i < p.length; i += 3) {
+        const px = p[i], py = p[i + 1], pz = p[i + 2];
+        const x = m[0] * px + m[4] * py + m[8] * pz + m[12];
+        const y = m[1] * px + m[5] * py + m[9] * pz + m[13];
+        const z = m[2] * px + m[6] * py + m[10] * pz + m[14];
+        const f = referenceShape(x, y, z);
+        p[i] = im[0] * f.x + im[4] * f.y + im[8] * f.z + im[12];
+        p[i + 1] = im[1] * f.x + im[5] * f.y + im[9] * f.z + im[13];
+        p[i + 2] = im[2] * f.x + im[6] * f.y + im[10] * f.z + im[14];
+        if (!normals) continue;
+        const nx = normals[i], ny = normals[i + 1], nz = normals[i + 2];
+        const gx = nm[0] * nx + nm[3] * ny + nm[6] * nz;
+        const gy = nm[1] * nx + nm[4] * ny + nm[7] * nz;
+        const gz = nm[2] * nx + nm[5] * ny + nm[8] * nz;
+        const wx = gx / f.xx, wz = gz / f.zz, wy = (gy - f.xy * wx - f.zy * wz) / f.yy;
+        const lx = inn[0] * wx + inn[3] * wy + inn[6] * wz;
+        const ly = inn[1] * wx + inn[4] * wy + inn[7] * wz;
+        const lz = inn[2] * wx + inn[5] * wy + inn[8] * wz;
+        const length = Math.hypot(lx, ly, lz) || 1;
+        normals[i] = lx / length; normals[i + 1] = ly / length; normals[i + 2] = lz / length;
+      }
+      geometry.attributes.position.needsUpdate = true;
+      if (normals) geometry.attributes.normal.needsUpdate = true;
+      geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+      if (!entry.dynamic) {
+        entry.finalPositions ||= new Float32Array(p.length); entry.finalPositions.set(p);
+        if (normals) { entry.finalNormals ||= new Float32Array(normals.length); entry.finalNormals.set(normals); }
+        entry.lastMatrix ||= new THREE.Matrix4(); entry.lastMatrix.copy(matrix);
+        entry.finalBox ||= new THREE.Box3(); entry.finalBox.copy(geometry.boundingBox);
+        entry.finalSphere ||= new THREE.Sphere(); entry.finalSphere.copy(geometry.boundingSphere);
+      }
+    }
+  }
+
   let previous = '';
   function update(input = {}) {
     for (const key of keys) state[key] = clamp(Number.isFinite(input[key]) ? input[key] : 0, key === 'tongueLeft' ? -1 : 0, 1);
     const signature = keys.map(key => state[key].toFixed(4)).join(',');
     if (signature === previous) return;
     previous = signature;
+    restoreRestShape();
     updateMouth(); updateHead(); containDentalArches(); containTongue();
     for (const { sign, eye, closed, brow } of eyes) {
       const blink = sign > 0 ? state.blinkLeft : state.blinkRight;
@@ -789,6 +957,7 @@ export function createCharacter() {
       cheek.position.set(sign * (0.79 + puff * 0.027), -0.29 + raise * 0.085, 0.833 + puff * 0.145);
       cheek.scale.set(0.205 + puff * 0.025, 0.115 + puff * 0.025 - raise * 0.012, 0.032);
     }
+    applyRestShape();
     group.userData.state = { ...state };
   }
 
@@ -811,7 +980,9 @@ export function createCharacter() {
     group.userData.wireframe = wireframe;
   }
   function setWireframe(value) { wireframe = Boolean(value); applyAppearance(); }
-  function setCutaway(value) { cutaway = Boolean(value); updateMouth(); containDentalArches(); containTongue(); applyAppearance(); }
+  function setCutaway(value) {
+    cutaway = Boolean(value); previous = ''; update({ ...state }); applyAppearance();
+  }
   function dispose() {
     for (const geometry of geometries) geometry.dispose();
     for (const mat of materials) mat.dispose();
@@ -822,5 +993,7 @@ export function createCharacter() {
   group.userData.controls = [...keys];
   group.userData.coordinateSystem = { up: '+Y', forward: '+Z', anatomicalLeft: '+X' };
   update();
+  captureRestShape(); applyRestShape();
+  group.userData.restShape = { method: 'shared-monotone-reference-cage', landmarks: { eyeY: 0.265, mouthY: -0.38, chinY: -0.92 } };
   return { group, update, setWireframe, setCutaway, dispose };
 }
