@@ -22,11 +22,20 @@ The repository includes native iOS and Google Pixel apps, a browser-based lesson
 
 ## Watch Speechly
 
-<a href="https://speechlyweb.netlify.app/#video"><img src="docs/assets/speechly-iphone-demo-poster.png" alt="Speechly iPhone practice screen with live lip tracking; open the full demonstration video" width="280"></a>
+Three frames from the native iPhone recording show the full practice flow:
+
+<table>
+  <tr><th>1 · Practice</th><th>2 · Mouth Guide</th><th>3 · Results</th></tr>
+  <tr>
+    <td><img src="docs/assets/app-practice.jpg" alt="Practice screen showing the editable speech recognition guess and confirmed words" width="220"></td>
+    <td><img src="docs/assets/app-mouth-guide.jpg" alt="Mouth Guide screen highlighting a word beside the animated reference mouth" width="220"></td>
+    <td><img src="docs/assets/app-results.jpg" alt="Results screen showing a voice trace and a suggested next practice step" width="220"></td>
+  </tr>
+</table>
 
 [Watch the full 1:29 iPhone app recording](https://speechlyweb.netlify.app/assets/speechly-iphone-demo.mp4) · [Try the iOS browser view](https://speechlyweb.netlify.app/phone-demo.html?device=iphone) · [Try the Pixel browser view](https://speechlyweb.netlify.app/phone-demo.html?device=pixel)
 
-The recording shows the native iPhone app. The iOS and Pixel links open the website's separate interactive browser preview.
+The screenshots and recording show the native iPhone app. The iOS and Pixel links open the website's separate interactive browser preview.
 
 ## Images from the website
 
