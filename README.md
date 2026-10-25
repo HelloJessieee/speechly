@@ -1,5 +1,7 @@
 # Speechly
 
+<img src="docs/assets/speechly-icon.png" alt="Speechly app icon" width="96">
+
 **Website:** [Speechly product site](https://speechlyweb.netlify.app/) — the story, complete practice flow, team, and interactive 3D guide.
 
 ### Being understood changes what someone can do next.
@@ -13,6 +15,16 @@ We are building for English learners and people with speech differences, includi
 **Speak → See → Improve.** Record and confirm your words; follow a visual guide; review the evidence, practice one action, and try again.
 
 The repository includes native iOS and Google Pixel apps, a browser-based lesson experience, and a Mac companion for local Whisper recognition, speech measurements, experimental phoneme comparison, and Gemma 4 E2B coaching through LiteRT-LM. The visual guide and model outputs are practice aids. Speechly does not diagnose, treat, or score a medical condition, and the prototype has not established clinical or pronunciation outcomes.
+
+## Watch Speechly
+
+<a href="https://speechlyweb.netlify.app/#video"><img src="docs/assets/speechly-iphone-demo-poster.png" alt="Speechly iPhone practice screen with live lip tracking; open the full demonstration video" width="280"></a>
+
+[Watch the full 1:29 iPhone app recording](https://speechlyweb.netlify.app/assets/speechly-iphone-demo.mp4) · [Try the iOS browser view](https://speechlyweb.netlify.app/phone-demo.html?device=iphone) · [Try the Pixel browser view](https://speechlyweb.netlify.app/phone-demo.html?device=pixel)
+
+The recording shows the native iPhone app. The iOS and Pixel links open the website's separate interactive browser preview.
+
+## Images from the website
 
 <img src="docs/assets/team.jpg" alt="The Speechly team together outdoors" width="720">
 
