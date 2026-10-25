@@ -4,6 +4,8 @@
 
 **Website:** [Speechly product site](https://speechlyweb.netlify.app/) — the story, complete practice flow, team, and interactive 3D guide.
 
+**Hugging Face:** [Our profile](https://huggingface.co/Jessicaaaaaaaaa) · [Speechly's fine-tuned phoneme adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc)
+
 > **Built with LiteRT-LM.** Speechly runs **Gemma 4 E2B locally on the Mac through LiteRT-LM**. The iOS and Pixel apps record speech and show the practice guide; the Mac service loads the `.litertlm` model, uses the GPU backend by default, and returns one suggestion based on speaker-confirmed words and measured signals. The model does not run in the phone apps or the website's browser preview.
 
 > **Our fine-tuning.** We fine-tuned a Wav2Vec2 CTC phoneme recognizer on manually annotated L2-ARCTIC speech to study the sounds a speaker produced. The [published adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) document the training and validation results. This experimental phoneme model is separate from Gemma; **we did not fine-tune Gemma**.
@@ -59,7 +61,7 @@ The screenshots and recording show the native iPhone app. The iOS and Pixel link
 ## The complete practice loop
 
 1. **Speak and confirm.** Speak freely or choose a target word, then record or import audio. The web analysis prototype shows live microphone level and can optionally track visible lip movement with the camera. Whisper proposes a transcript; the speaker edits it to match what they intended to say. The model's guess never becomes the speaker's intention by default.
-2. **See the movement.** The confirmed sentence becomes a looping word-by-word mouth guide. A yellow outline shows the illustrative reference while a blue outline traces measured lip movement when the camera is on. The guide can be replayed slowly, viewed step by step, or used with preset word lessons.
+2. **See and feel the movement.** The confirmed sentence becomes a looping word-by-word mouth guide. A yellow outline shows the illustrative reference while a blue outline traces measured lip movement when the camera is on. On iOS and Pixel, optional light vibrations mark changes in the reference mouth movement, giving a tactile cue for the next mouth shape. The guide can be replayed slowly, viewed step by step, or used with preset word lessons. The vibrations follow the guide's timing; they do not judge pronunciation.
 3. **Understand and retry.** The result separates model guesses from measured evidence: recording quality, duration, volume, pitch, and optional tentative phoneme comparison for single words. Gemma 4 E2B reads the confirmed words and structured measurements to suggest one practical next step. The speaker can replay, focus on a word, and record again.
 
 In both native app modes, recording and live visual guidance run on the phone while a trusted-network Mac companion runs Whisper, the experimental phoneme model, and Gemma through LiteRT-LM. The separate browser lesson app also offers guided examples and demo feedback. Neither model output nor visual animation is a pronunciation score or diagnosis.
@@ -103,7 +105,13 @@ Whisper drafts the transcript, and the speaker confirms what they meant. The pho
 
 We started from [`facebook/wav2vec2-lv-60-espeak-cv-ft`](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) and fine-tuned its top two acoustic transformer layers and CTC head for one epoch on 3,380 usable, manually annotated [L2-ARCTIC](https://psi.engr.tamu.edu/l2-arctic-corpus-docs/) utterances. Speakers were split between training, validation, and a reserved test set. On the 888-utterance validation split, phone error rate fell from **28.24% to 20.08%**; error-location precision rose from **17.20% to 25.98%**. These are validation results, not performance claims for new speakers or clinical use.
 
-The [public research adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) contain the updated weights and restoration instructions, without speech recordings or annotations. The held-out test is unfinished, false alarms remain common, and the L2-ARCTIC license restricts commercial use. The Mac service can use the restored checkpoint when installed; otherwise it uses the base phoneme model.
+**What we published on Hugging Face:** The [model repository](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) provides:
+
+- **Adapter weights:** 102 MB covering the 34 tensors updated during fine-tuning, plus processor files. It includes no speech recordings or annotations.
+- **Restoration instructions:** The model card and `restore_model.py` explain how to combine the adapter with the pinned Wav2Vec2 base checkpoint into a complete model of about 1.26 GB. The adapter alone is not a runnable full model.
+- **Speechly setup:** Put the restored checkpoint at `mac_service/models/pronunciation/l2-arctic-ctc/best/` for the Mac service to use it. Without that checkpoint, the service uses the base phoneme model.
+
+**Research limits:** The held-out test is unfinished, false alarms remain common, and the L2-ARCTIC data license restricts commercial use. This Hugging Face release is the experimental phoneme recognizer, not Gemma or the LiteRT-LM model.
 
 Gemma 4 E2B has a different job. It runs **locally on the Mac through LiteRT-LM**, using the speaker-confirmed words and measured voice and lip signals to suggest one practical action to try next. We did not fine-tune Gemma. The phoneme checkpoint is not part of the current web experience and cannot support confident individual corrections or claims about people with speech disabilities.
 
