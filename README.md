@@ -51,7 +51,7 @@ flowchart LR
     A -->|record again| B
 ```
 
-The Mac can run the models locally without a cloud model API; the phone and Mac still need a trusted local connection. The separate browser lesson app has a distinct, optional Claude feedback path described below.
+The Mac runs the models locally; the phone and Mac still need a trusted local connection.
 
 ### Why Gemma is in the loop
 
@@ -76,7 +76,7 @@ npm test           # Playwright browser tests (starts the dev server automatical
 npm run lint
 ```
 
-This browser lesson app needs no API keys, backend or network services. Fonts and icons are bundled locally. Camera and microphone access require
+The browser lesson's demo flow needs no API keys, backend or network services. Fonts and icons are bundled locally. Camera and microphone access require
 `localhost` or HTTPS.
 
 ## What works
@@ -104,30 +104,9 @@ This browser lesson app needs no API keys, backend or network services. Fonts an
 - **Responsive layout:** lesson selector, reference and guide, practice, and feedback sit side by side on desktop and stack on
   mobile. Keyboard focus is visible and the page has a skip link.
 
-## Claude feedback
+## Local lip tracking
 
-When the camera is on, Speechly measures the lips while you record and can ask Claude for feedback on that attempt.
-
-1. **Lip tracking (in the browser).** MediaPipe Face Landmarker (478-point face mesh) runs locally on each camera frame. The
-   model and WebAssembly runtime are bundled in `public/mediapipe/`, so no CDN is needed.
-2. **Measurements (in the browser).** For every frame, `src/analysis/features.ts` measures inner-lip opening, mouth width,
-   lower-lip thickness and lip protrusion in the face's own coordinate frame, so head position and camera distance don't matter.
-   `src/analysis/summarize.ts` compares the attempt with your own resting mouth and runs the lesson's checks: lip closure, rounding,
-   spreading, or the lower lip raised toward the upper teeth. It reports each one as *seen*, *unclear* or *not seen*, and keeps up
-   to four small mouth-only snapshots.
-3. **Feedback (on the server).** When you click **Get feedback from Claude**, the measurements and snapshots go to
-   `POST /api/feedback`. That route is served by the Vite dev and preview servers (`server/feedbackApi.ts`). `server/claudeFeedback.ts`
-   calls Claude (`CLAUDE_MODEL`, default `claude-opus-5-5`) with a JSON schema, so the reply is typed feedback:
-   status, practice focus, a hedged **observation** with its evidence, a **suggestion**, a comparison with your previous attempt,
-   and the next action. Server-side refusal fallback (`fallbacks: "default"`) is enabled for supported models.
-
-Privacy: nothing leaves the browser until you click the Claude button. Then only the measurements and up to four mouth-only JPEG
-crops are sent. Audio is never sent, because Claude cannot hear it. Demo feedback remains available offline and as a fallback when
-Claude is unavailable.
-
-Limits: landmarks and still images are approximate. Teeth and tongue are not tracked, and sound, voicing and accent are not
-assessed. The `/api/feedback` route runs inside the Vite server. A deployed site needs the same handler on a real backend; the
-handler is framework-agnostic.
+When the camera is on, MediaPipe Face Landmarker runs locally in the browser. `src/analysis/features.ts` measures visible lip opening, width, and movement; `src/analysis/summarize.ts` compares the attempt with the speaker's resting mouth. These approximate signals are not a pronunciation score. Teeth, tongue, sound, voicing, and accent are not assessed by the camera.
 
 ### Testing face tracking
 
@@ -136,8 +115,6 @@ handler is framework-agnostic.
 ```bash
 FACE_VIDEO=/path/to/face.y4m npm test
 ```
-
-The Claude API is mocked in tests, so they never spend credits.
 
 ### Credits
 
@@ -176,14 +153,9 @@ See [android/README.md](android/README.md) for Android Studio and Pixel setup.
 ## Reserved for later development in the browser lesson app
 
 - Direct integration of the Mac speech-analysis service into this browser lesson app.
-- A standalone backend for deployment (the feedback handler is ready to move).
 - Model inference directly on the phone, and any fine-tuning.
 - User accounts, saved progress, and lesson authoring.
 - Persisting or uploading recordings.
-
-## Claude API key
-
-Copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY`. The account needs API credits. Restart `npm run dev` after editing `.env`. The key is read only on the server side: never give it a `VITE_` prefix, because Vite bundles `VITE_*` variables into browser code. The dev server refuses to start if a key-like variable has that prefix. `.env` is ignored by git.
 
 ## Project structure
 

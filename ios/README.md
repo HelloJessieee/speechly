@@ -70,12 +70,11 @@ so bind it only on a trusted local network.
 
 The model inference for arbitrary sentences and recording analysis currently
 runs on the Mac; this is a native iPhone app with a networked analysis service,
-not an on-device model port. The existing Claude/demo lesson feedback remains
-available separately.
+not an on-device model port.
 
 If you prefer not to use XcodeGen: create a new iOS App project named MouthCoach (SwiftUI, Swift), delete its generated
 `ContentView.swift` and `MouthCoachApp.swift`, drag the `MouthCoach/` folder in, and add the Info.plist keys listed in `project.yml`
-(camera and microphone usage descriptions, `MouthCoachFeedbackServerURL`, `NSAppTransportSecurity`).
+(camera and microphone usage descriptions and `NSAppTransportSecurity`).
 
 ## How it maps to the web app
 
@@ -93,18 +92,6 @@ If you prefer not to use XcodeGen: create a new iOS App project named MouthCoach
 
 Lessons have one source of truth. After editing `src/data/lessons.ts`, run `npm run export:lessons` in the repository root to
 refresh `ios/MouthCoach/Resources/lessons.json`.
-
-## Claude feedback
-
-The app never contains the Claude API key. Like the web app, it sends the lip measurements and up to four mouth-only snapshots
-to the Speechly feedback server (`POST /api/feedback`), which calls Claude with the key from `.env`.
-
-- **Simulator:** the default `MouthCoachFeedbackServerURL` is `http://localhost:5173`, which reaches `npm run dev` on the same Mac.
-- **iPhone on the same Wi-Fi:** run the server on your Mac with `npm run dev -- --host 0.0.0.0`, then set
-  `MouthCoachFeedbackServerURL` in `project.yml` to `http://<your-mac's-IP>:5173` and regenerate.
-- **App Store / TestFlight:** deploy the server handler (`server/claudeFeedback.ts`) behind HTTPS and point the URL there.
-
-Without a reachable server, the app offers demo feedback.
 
 ## Verifying the app
 
