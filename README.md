@@ -1,4 +1,4 @@
-# Speech Mirror
+# Speechly
 
 **Website:** [Speechly product site](https://speechlyweb.netlify.app/) — the story, complete practice flow, team, and interactive 3D guide.
 

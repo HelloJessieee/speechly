@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.js';
 import { OrbitControls } from './vendor/OrbitControls.js';
-import { createCharacter } from './rig.js?rev=teeth-2';
+import { createCharacter } from './rig.js?rev=proportions-4';
 import { createController, parameterSchema, presets, sampleSequences } from './controller.js';
 
 const $ = (s) => document.querySelector(s);
@@ -44,10 +44,10 @@ window.articulation=Object.freeze({version:'0.1',protocolVersion:controller.prot
 
 try{
  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(37,1,.1,100);camera.position.set(0,.05,8.7);
- renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0x000000,0);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.14;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;viewport.append(renderer.domElement);renderer.domElement.setAttribute('aria-label','可拖动旋转的三维卡通男孩模型');renderer.domElement.setAttribute('role','img');
- scene.add(new THREE.HemisphereLight(0xfffbea,0x728a6d,2.3));const key=new THREE.DirectionalLight(0xffe8d0,3.2);key.position.set(-3,5,6);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-4;key.shadow.camera.right=4;key.shadow.camera.top=4;key.shadow.camera.bottom=-4;key.shadow.normalBias=.04;key.shadow.bias=-.001;scene.add(key);const fill=new THREE.DirectionalLight(0xd9eeff,2);fill.position.set(4,1,3);scene.add(fill);const rim=new THREE.DirectionalLight(0xf1ffe0,3);rim.position.set(1,4,-3);scene.add(rim);
+ renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0x000000,0);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;viewport.append(renderer.domElement);renderer.domElement.setAttribute('aria-label','可拖动旋转的三维卡通男孩模型');renderer.domElement.setAttribute('role','img');
+ scene.add(new THREE.HemisphereLight(0xfff8ee,0xb89b89,1.75));const key=new THREE.DirectionalLight(0xffe8d0,2.45);key.position.set(-3,5,6);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-4;key.shadow.camera.right=4;key.shadow.camera.top=4;key.shadow.camera.bottom=-4;key.shadow.normalBias=.025;key.shadow.bias=-.001;scene.add(key);const fill=new THREE.DirectionalLight(0xd9eeff,1.35);fill.position.set(4,1,3);scene.add(fill);const rim=new THREE.DirectionalLight(0xfff0d8,2.1);rim.position.set(1,4,-3);scene.add(rim);
  rig=createCharacter();scene.add(rig.group);rig.update(lastState);rig.group.traverse(obj=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;}});
- const floor=new THREE.Mesh(new THREE.CircleGeometry(2.1,72),new THREE.ShadowMaterial({color:0x567647,opacity:.14}));floor.rotation.x=-Math.PI/2;floor.position.y=-2.67;scene.add(floor);
+ const floor=new THREE.Mesh(new THREE.CircleGeometry(2.1,72),new THREE.ShadowMaterial({color:0x567647,opacity:.14}));floor.rotation.x=-Math.PI/2;floor.position.y=new THREE.Box3().setFromObject(rig.group).min.y-.025;scene.add(floor);
  orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(0,-.23,0);orbit.enableDamping=true;orbit.dampingFactor=.075;orbit.enablePan=false;orbit.minDistance=4.1;orbit.maxDistance=12;orbit.minPolarAngle=.3;orbit.maxPolarAngle=Math.PI-.45;orbit.addEventListener('start',()=>{$$('[data-view]').forEach(b=>b.classList.remove('selected'));});
  function resize(){const{width,height}=viewport.getBoundingClientRect();renderer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix();}new ResizeObserver(resize).observe(viewport);resize();$('#loading').remove();
  let cameraTween=null;function setView(view){let target=orbit.target.clone();let distance=view==='side'?8.4:8.7;const views={front:new THREE.Vector3(0,.05,distance),threequarter:new THREE.Vector3(5.7,.4,6.6),side:new THREE.Vector3(8.6,.1,.15)};cameraTween={start:performance.now(),from:camera.position.clone(),to:views[view]||views.front};$$('[data-view]').forEach(b=>b.classList.toggle('selected',b.dataset.view===view));}
