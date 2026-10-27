@@ -6,9 +6,9 @@
 
 **Hugging Face:** [Our profile](https://huggingface.co/Jessicaaaaaaaaa) · [Speechly's fine-tuned phoneme adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc)
 
-> **Built with LiteRT-LM.** Speechly runs **Gemma 4 E2B locally on the Mac through LiteRT-LM**. The iOS and Pixel apps record speech and show the practice guide; the Mac service loads the `.litertlm` model, uses the GPU backend by default, and returns one suggestion based on speaker-confirmed words and measured signals. The model does not run in the phone apps or the website's browser preview.
+> **Built with LiteRT-LM.** Speechly runs **Gemma 4 E2B locally on the Mac through LiteRT-LM**. The iOS and Pixel apps record speech and show the practice guide; the Mac service loads the `.litertlm` model, uses the GPU backend by default, and returns one suggestion based on speaker-confirmed words and measured signals.
 
-> **Our fine-tuning.** We fine-tuned a Wav2Vec2 CTC phoneme recognizer on manually annotated L2-ARCTIC speech to study the sounds a speaker produced. The [published adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) document the training and validation results. This experimental phoneme model is separate from Gemma; **we did not fine-tune Gemma**.
+> **Our fine-tuning.** We fine-tuned a Wav2Vec2 CTC phoneme recognizer on manually annotated L2-ARCTIC speech to study the sounds a speaker produced. The [published adapter and model card](https://huggingface.co/Jessicaaaaaaaaa/l2-arctic-perceived-phoneme-ctc) document the training and validation results. This experimental phoneme model is separate from Gemma.
 
 ## Why Speechly matters
 
@@ -73,7 +73,7 @@ Choose the native app for your phone:
 - **iOS:** [SwiftUI app and setup](ios/README.md) for iPhone and iPad.
 - **Google Pixel / Android:** [Kotlin and Jetpack Compose app and setup](android/README.md).
 
-Both apps provide Practice, Mouth Guide, and Results pages. You can type a sentence to create a visual guide, or record speech and confirm the proposed words before reviewing measurements and a practice suggestion. Set up the shared [Mac analysis service](mac_service/README.md) and connect the phone to it on a trusted local network for Whisper and Gemma features. The model runs on the Mac, not on either phone. The [website's phone demo](https://speechlyweb.netlify.app/phone-demo.html) offers iOS and Pixel views of a separate browser preview.
+Both apps provide Practice, Mouth Guide, and Results pages. You can type a sentence to create a visual guide, or record speech and confirm the proposed words before reviewing measurements and a practice suggestion. Set up the shared [Mac analysis service](mac_service/README.md) and connect the phone to it on a trusted local network for Whisper and Gemma features. The [website's phone demo](https://speechlyweb.netlify.app/phone-demo.html) offers iOS and Pixel views of a separate browser preview.
 
 ### Where each step runs
 
@@ -113,7 +113,7 @@ We started from [`facebook/wav2vec2-lv-60-espeak-cv-ft`](https://huggingface.co/
 
 **Research limits:** The held-out test is unfinished, false alarms remain common, and the L2-ARCTIC data license restricts commercial use. This Hugging Face release is the experimental phoneme recognizer, not Gemma or the LiteRT-LM model.
 
-Gemma 4 E2B has a different job. It runs **locally on the Mac through LiteRT-LM**, using the speaker-confirmed words and measured voice and lip signals to suggest one practical action to try next. We did not fine-tune Gemma. The phoneme checkpoint is not part of the current web experience and cannot support confident individual corrections or claims about people with speech disabilities.
+Gemma 4 E2B has a different job. It runs **locally on the Mac through LiteRT-LM**, using the speaker-confirmed words and measured voice and lip signals to suggest one practical action to try next. The phoneme checkpoint is not part of the current web experience and cannot support confident individual corrections or claims about people with speech disabilities.
 
 ## Browser lesson app: setup and run
 
@@ -205,7 +205,6 @@ See [android/README.md](android/README.md) for Android Studio and Pixel setup.
 ## Reserved for later development in the browser lesson app
 
 - Direct integration of the Mac speech-analysis service into this browser lesson app.
-- Model inference directly on the phone, and any fine-tuning.
 - User accounts, saved progress, and lesson authoring.
 - Persisting or uploading recordings.
 
